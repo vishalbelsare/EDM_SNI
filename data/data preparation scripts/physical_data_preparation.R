@@ -125,72 +125,34 @@ npgo.per <- npgo %>% rename(npgo='NPGO index') %>%
 #### Significant Wave Height ####
 
 # Two sources of wave data
-# first is buoy data from CDIP
-# source: http://cdip.ucsd.edu
-# Wave height and sea surface temperature collected at two nearby buoys
+# Almost all from Tom Bell (newly modeled)
 
-waves.buoy <- read_csv("data/raw/Begg_SNI_CDIP.csv",col_types = cols()) %>%
-
-# Variable Hs denotes significant wave height in meters; 
+# Variable max_Hs denotes significant wave height in meters; 
 # Derived from the zeroeth moment of the reported energy spectrum.
 # Described as the "average height of the one third highest waves in the record over the time period"
-  
-  select(Dataset,Year,Month,Mean_Hs)
-
-waves.per <- waves.buoy %>%
-  
-  # Use the periods key to assign periods to each month, and remove irrelevant data
-  left_join(period.key,by=c("Year"="year","Month"="month")) %>%
-  filter(!is.na(period)) %>%
-  
-  # group by period, and find Maximum Hs during each period
-  # this differs from the averaging we did for MEI, PDO, and NPGO
-  group_by(period) %>%
-  summarise(waves.max=max(Mean_Hs)) %>%
-  
-  # normalize to zero mean, unit variance
-  mutate(waves.norm=(waves.max-mean(waves.max))/sd(waves.max))
 
 # Second source is from
 # http://www.sccoos.org/data/waves/
 # USGS Coastal and Marine Geology Program
 # http://cmgwindwave.usgsportals.net/
 # Modeled waves from the Geophysical Fluid Dynamics Laboratory
-# Complete, but only goes through 2005. We will join the normalized datasets together to form a more complete picture
-# Code that produced the below .csv is available in this directory as "wave_height_ncdf4_extract.R"
+# Complete, but only goes through 2005. We joined the datasets together to form a more complete picture
+# Code that produced the below is available in this directory
 
-source("data/data preparation scripts/wave_height_ncdf4_extract.R")
+source("data/data preparation scripts/wave_height_Bell.R")
 
-waves.modeled <- wavesdf %>% 
+
+# Join the two datasets together, using the normalized buoy data to "fill in" the modeled data
+wavesboth <- wavesdf %>%
+  mutate(waves.norm=(maxHs-mean(maxHs,na.rm=T)/sd(maxHs,na.rm=T)))%>%
   # Use the periods key to assign periods to each month, and remove irrelevant data
   left_join(period.key,by=c("year"="year","month"="month")) %>%
   filter(!is.na(period)) %>%
   
-  # group by period, and find Maximum Hs during each period
-  # this differs from the averaging we did for MEI, PDO, and NPGO
+  # For each period, average the SST value to make just one value for each period
   group_by(period) %>%
-  summarise(waves.max.mod=max(maxHs)) %>%
-  
-  # normalize to zero mean, unit variance
-  mutate(waves.norm.mod=(waves.max.mod-mean(waves.max.mod))/sd(waves.max.mod))
-
-# Join the two datasets together, using the normalized buoy data to "fill in" the modeled data
-wavesboth <- full_join(waves.modeled,waves.per,by="period") %>%
-  mutate(waves.norm.both=coalesce(waves.norm.mod,waves.norm)) %>%
-  
-  # normalize again and remove previous columns
-  mutate(waves.norm.c=(waves.norm.both-mean(waves.norm.both))/sd(waves.norm.both))%>%
-  select(-waves.norm.mod,-waves.norm,-waves.norm.both)
-
-# [Not run]: Plot of maximum wave height values and normalized maximum weight height values for each period
-# ggplot(wavesboth,aes(x=period,y=waves.norm.c)) +
-#   geom_line(color="darkblue")+
-#   geom_line(aes(y=waves.norm.mod),color="darkred")+
-#   geom_line(aes(y=waves.norm),color="darkgreen")+
-#   xlab("Period")+
-#   ylab("Normalized Maximum Significant \nWave Height from two sources")+
-#   ggtitle("Max Wave Height over SNI monitoring periods")+
-#   geom_hline(yintercept=0,linetype=2)
+  summarise(waves.norm=max(waves.norm,na.rm=T)) %>%
+  ungroup()
 
 #### Sea Surface Temperature ####
 
@@ -223,7 +185,7 @@ sst.per <- noaa.sst %>%
 phys.dat <- full_join(mei.per,pdo.per,by="period") %>% full_join(npgo.per,by="period") %>% 
   full_join(wavesboth,by="period") %>% full_join(sst.per,by="period")
 phys.dat.norm <- phys.dat %>% select(period, contains("norm")) %>%
-  rename(mei=mei.norm,sst=sst.norm,waves=waves.norm.c,pdo=pdo.norm,npgo=npgo.norm)
+  rename(mei=mei.norm,sst=sst.norm,waves=waves.norm,pdo=pdo.norm,npgo=npgo.norm)
 
 ## [Not run] Plot of all normalized physical variables
 # gather(phys.dat.norm,key=var,value=val,mei:sst) %>%

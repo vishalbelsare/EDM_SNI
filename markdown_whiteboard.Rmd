@@ -1,0 +1,26 @@
+---
+output:
+  pdf_document: default
+---
+We now have a trove of new data: data describing interactions between species, interactions that vary with the state of ecosystem. In general, the multivariate models perform well (i.e. achieve good preditive power). 
+
+```{r multivariate model stats,message=F,warning=F}
+library(knitr)
+library(tidyverse)
+require(kableExtra)
+
+
+
+x<-data.frame(spp=c(1,2,3),theta=c(3,4,5),rho=c(.89,.99,.32),mae=c(.4,.5,.6),
+                lngstr=rep("this is a long string. this is a long string. this is a long string. this is a long string.this is a long string. this is a long string.this is a long string. this is a long string.this is a long string. this is a long string.this is a long string. this is a long string.",3))
+
+knitr::kable(x,format = "latex",col.names=c("Species","Nonlinearity", "$\\rho$","MAE","String"),
+             caption="Multivariate S-map Model Statistics, with nonlinearity,
+             correlation of predictions with observations, and mean absolute error.",
+             escape=F) %>%
+  kable_styling(full_width = F) %>%
+  column_spec(3,bold=T)%>%
+  column_spec(5, width = "30em")
+
+
+```

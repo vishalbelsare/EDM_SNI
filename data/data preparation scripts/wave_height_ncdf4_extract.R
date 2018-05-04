@@ -10,8 +10,6 @@
 # Latitude: 33.221 Longitude -119.882
 
 library(ncdf4)
-library(tidyverse)
-library(lubridate)
 
 modwaves <- nc_open("data/raw/wave_significant_height_enp_gfdlhistorical.nc")
 ##[Not run] view structure of NCDF file
@@ -33,14 +31,15 @@ calc_maxHs <- function(Hs) {
 # Convert to data frame
 wavesdf <- data_frame(time=times,Hs=heights,date=as_date(as.POSIXct(time,origin="1970-01-01 00:00:00"))) %>%
   #Calculate montly means
-  mutate(year=year(date),month=month(date)) %>%
+  mutate(year=year(date),month=month(date),day=day(date)) %>%
   
   # Calculate the average height of one third highest waves for each month
   group_by(year,month) %>%
   mutate(maxHs=calc_maxHs(Hs)) %>%
   
   # Finally, filter so there's just one value for each month
-  distinct(year,month,maxHs)
+  distinct(year,month,maxHs) %>%
+  ungroup()
 
 
 # Remove unneeded data from workspace

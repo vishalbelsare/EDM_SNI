@@ -93,3 +93,10 @@ wavesdf %>%
   geom_line()+
   scale_color_discrete(labels=c("Bell","USGS"))+
   theme_minimal()
+
+wavesdf %>%
+  ggplot(aes(maxHs,maxHs_usgs))+
+  geom_point()+
+  geom_abline(slope=1,intercept=0,linetype=2)+
+  labs(title="Max Daily Wave Height",x="Bell height",y="USGS height")+
+  theme_minimal()

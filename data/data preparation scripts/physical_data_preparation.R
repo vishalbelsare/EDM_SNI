@@ -144,7 +144,7 @@ source("data/data preparation scripts/wave_height_Bell.R")
 
 # Join the two datasets together, using the normalized buoy data to "fill in" the modeled data
 wavesboth <- wavesdf %>%
-  mutate(waves.norm=(maxHs-mean(maxHs,na.rm=T)/sd(maxHs,na.rm=T)))%>%
+  mutate(waves.norm=(maxHs-mean(maxHs,na.rm=T))/sd(maxHs,na.rm=T))%>%
   # Use the periods key to assign periods to each month, and remove irrelevant data
   left_join(period.key,by=c("year"="year","month"="month")) %>%
   filter(!is.na(period)) %>%

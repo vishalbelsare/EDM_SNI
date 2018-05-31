@@ -6,8 +6,13 @@ date: "March 13, 2018"
 output: pdf_document
 bibliography: citation_bibtex.bib
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
+
+```{r global_options, include=F,message=F}
+require(knitr)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE)
+```
 
 ```{r setup, include=FALSE,message=F}
 # Load required packages
@@ -216,7 +221,7 @@ westend.bestE <- sapply(westend.simp.list,function(x) {
 # on looking at the graph, manually change embedding dimension for macrocystis and pterygophora to one that has a very similar
 # predictability, but will let us make use of more data
 
-westend.bestE["ymac"] <- 8
+westend.bestE["ymac"] <- 3
 westend.bestE["pter"] <- 6
 
 rm(spp,dat,out)
@@ -593,9 +598,11 @@ all.mod.coeffs.plot.box <- all.mod.coeffs.long %>%
   #plot
   ggplot(aes(x=plotting,y=value,fill=type))+
   geom_boxplot(outlier.alpha=0.4,outlier.size=1,width=0.8,position = "identity")+
+  stat_summary(fun.y=mean, colour="white", geom="point", 
+               shape=17, size=2,show.legend = FALSE)+
   scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
   geom_hline(yintercept=0,linetype=2)+
-  geom_text(aes(x=1.2,y=1.8,label=label),size=6, parse=T,check_overlap=TRUE,show.legend = FALSE)+
+  geom_text(aes(x=1.2,y=1.8,label=label),size=4, parse=T,check_overlap=TRUE,show.legend = FALSE)+
   ylim(-2,2)+
   coord_flip()+
   labs(y="Estimated Interaction Coefficient",x="Interacting Species")+
@@ -603,7 +610,7 @@ all.mod.coeffs.plot.box <- all.mod.coeffs.long %>%
   theme_rockwell()
 
 all.mod.coeffs.plot.box
-# ggsave("all_spp_coffs.png",plot=all.mod.coeffs.box,height=8,width=7.5)
+# ggsave("all_spp_coffs.png",plot=all.mod.coeffs.plot.box,height=8,width=7.5)
 ```
 
 These are box-and-whisker plots of estimated species interaction strengths from S-map models for the five focal species (panels top to bottom): *Macrocystis* adults, *Macrocystis* juveniles, *Pterygophora*, *Laminaria*, purple urchin, and red urchin. Each colored box represents the distribution of all estimated interaction coefficients (x-axis) of an interacting or forcing species (left y-axis) on a modeled species (right y-axis) across all data for a given model (vertical lines: median; box: interquartile range; whiskers extend to data point at most $1.5*IQR$ from the box). Correlation coefficient between predictions and observations denoted for each model. Color denotes hypothesized interaction type, including interspecific competition (between algae species or between urchin species), herbivory (urchin effect on algae), consumption (algae effect on urchins), and intraspecies interaction (the estimated interaction of a species with itself). Abbreviations: S. pur, *Strongylocentrotus purpuratus*; P cal., *Pterygophora californica*; M. pyr, *Macrocystis pyrifera*; M. fra, *Mesocentrotus franciscanus*; L. far, *Laminaria farlowii*.
@@ -621,7 +628,7 @@ Few strong and consistent competitive interactions (red boxes) are observed in m
 We can also investigate the effects of the physical forcing variables on the biological dynamics in a similar plot:
 
 
-```{r phys coeffs,echo=F,message=F,warning=F}
+```{r phys coeffs,echo=F,message=F,warning=F,fig.height=8}
 # with boxplot
 all.phys.coeffs.plot <- all.mod.coeffs.long %>%
   filter(effect %in% phys.vars)%>%
@@ -642,6 +649,8 @@ all.phys.coeffs.plot <- all.mod.coeffs.long %>%
     "sst"="SST")
     )+
   geom_boxplot(fill="dodgerblue2",outlier.alpha=0.4,position = "identity")+
+  stat_summary(fun.y=mean, colour="white", geom="point", 
+               shape=17, size=2,show.legend = FALSE)+
   geom_hline(yintercept=0,linetype=2)+
   ylim(-2,2)+
   coord_flip()+
@@ -668,57 +677,178 @@ The effects of physical forcing are not limited to the algal species, although t
 
 A major observation from the multivariate models is that many interactions between species and between species and their environments can be variable (positive or negative, depending on conditions). For the algal species especially, the combination of variable interspecific interaction strengths and occasionally strong environmental forcing effects suggests that the strength of species interactions may be driven by environmental context.
 
-We can observe this in our data by plotting the same interactions from the previous step against levels of the environmental variables. We will investigate the effect of environmental variables on mean interaction strength for the different interaction types (herbivory, competition, consumption).
+In order to observe this, we remove physical forcings and re-run the multivariate models with just the species interactions, and then look at the resulting trends through the lens of various physical forcing (to remove endogeneity). We will investigate the effect of environmental variables on interaction strength for the different interaction types (herbivory, competition, and intraspecies effects).
 
-```{r mean interactions, echo=F,warning=F,message=F}
-# Mean interactions over time
-mean_ints_by_time <- all.mod.coeffs.long %>%
-  select(period,mod,effect,value,type,spp_type) %>%
-  group_by(period,type) %>%
-  summarise(meanint=mean(value,na.rm=T),sdint=sd(value,na.rm=T))%>%
-  mutate(lowerint=meanint-sdint,upperint=meanint+sdint) %>% 
-  group_by(type)%>%
-  complete(period=full_seq(period,1))
+```{r model spp_only,warning=F,fig.height=8,fig.width=7.5}
+# remove physical variables from predictors then run models
+causal.vars.spp <- purrr::map(westend.causal.vars,function(x) setdiff(x,phys.vars))
+multi.mods.spp.only <- purrr::map(list("mac","purp","lam","ymac","red","pter"),function(x) {
+  smap_multi(westend,westend.segs,x,causal.vars.spp[[x]])
+})
+names(multi.mods.spp.only) <- c("mac","purp","lam","ymac","red","pter")
 
-# mean_ints_by_time %>%
-#   filter(!is.na(type),type!="intraspecies") %>%
-#   ggplot(aes(x=period,y=meanint,ymax=upperint,ymin=lowerint,color=type))+
-#   geom_line()+
-#   geom_hline(yintercept=0,linetype=2)+
-#   scale_color_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="Interaction\ntype")+
-#   coord_cartesian(ylim=c(-0.5,0.5))+
-#   labs(title="Mean species interactions\nby type over time",x="Monitoring Period",y="Interaction Strength")+
-#   theme_rockwell()
+# collect model performance statistics
+spp.only.model.perf <- tibble(Species=c("Macrocystis","Purple Urchin","Laminaria","Young Macrocystis","Red Urchin","Pterygophora"),
+                             Predictors=purrr::map(causal.vars.spp,.f=function(x){
+                               y=namekey$long[match(x,namekey$short)];paste(y,sep=",",collapse=", ")}),
+                             Rho = map_dbl(multi.mods.spp.only,function(x) x$model$rho),
+                             MAE=map_dbl(multi.mods.spp.only,function(x) x$model$mae),
+                             mod=c("mac","purp","lam","ymac","red","pter"))
+spp.only.model.perf %>% select(-mod) %>% 
+  kable("latex",col.names = c("Modeled Species","Predictors","$\\rho$","MAE"),digits=3,escape=F) %>%
+  kable_styling(full_width = F) %>%
+  column_spec(1,bold=T)%>%
+  column_spec(2, width = "30em")
 
+# Join all coefficients
+spp.only.mod.coeffs <- purrr::map(names(multi.mods.spp.only),function(x){
+  multi.mods.spp.only[[x]][["coeffs.long"]] %>% mutate(mod=x)
+  }
+  )%>%
+  bind_rows() %>%
+  mutate(mod_plotting_name = namekey$long[match(mod,namekey$short)])
+
+
+# assign interaction types: competition, herbivory (effect of urchins on algae), consumption (effect of algae on urchin), or growth
+algaes<-c("lam","mac","pter","ymac")
+urchins <- c("red","purp")
+combinations <- expand.grid(study_spp,study_spp) %>% 
+  rename(mod=Var1,effect=Var2) %>%
+  select(mod,effect)%>%
+  mutate(type = case_when(
+    mod ==   effect ~ "intraspecies",
+    mod == "mac" & effect == "ymac" ~ "intraspecies",
+    mod == "ymac" & effect == "mac" ~ "intraspecies",
+    mod %in% algaes & effect %in% algaes ~ "algal competition",
+    mod %in% urchins & effect %in% urchins ~ "urchin competition",
+    mod %in% algaes & effect %in% urchins ~ "herbivory",
+    mod %in% urchins & effect %in% algaes ~ "consumption",
+    TRUE ~ "NA"
+    ),
+    type=factor(type,levels=c("algal competition","urchin competition","herbivory","consumption","intraspecies")),
+    spp_type = case_when(
+      mod %in% algaes ~ "algae",
+      mod %in% urchins ~ "urchin",
+      TRUE ~ "none"
+    )
+  ) %>%
+  mutate_at(vars(mod,effect),as.character)
+
+# add rho label for facet plotting
+mod_rho_labels <- spp.only.model.perf %>%
+  mutate(label1="rho==",Rho_round=round(Rho,2))%>%
+  unite(label,label1,Rho_round,sep="",remove=F)%>%
+  select(mod,label)
+
+spp.only.mod.coeffs %>%
+  #add the type of interaction
+  left_join(combinations,by=c("mod","effect"))%>%
+  left_join(mod_rho_labels,by="mod") -> spp.only.mod.coeffs
+
+# boxplot of all species interactions
+spp.only.mod.coeffs.plot.box <- spp.only.mod.coeffs %>%
+   filter(effect %in% study_spp) %>%
+  #plot
+  ggplot(aes(x=plotting,y=value,fill=type))+
+  geom_boxplot(outlier.alpha=0.4,outlier.size=1,width=0.8,position = "identity")+
+  stat_summary(fun.y=mean, colour="white", geom="point", 
+               shape=17, size=2,show.legend = FALSE)+
+  scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+  geom_hline(yintercept=0,linetype=2)+
+  geom_text(aes(x=1.2,y=1.8,label=label),size=4, parse=T,check_overlap=TRUE,show.legend = FALSE)+
+  ylim(-2,2)+
+  coord_flip()+
+  labs(y="Estimated Interaction Coefficient",x="Interacting Species")+
+  facet_grid(mod_plotting_name~.,scales="free_y",space="free")+
+  theme_rockwell()
+
+spp.only.mod.coeffs.plot.box
+# ggsave("spp_only_mods_coeffs.png",plot=spp.only.mod.coeffs.plot.box,height=8,width=7.5)
+```
+
+```{r mean interactions, fig.height=8,fig.width=7.5}
 ## Mean interactions vs. physical conditions
 # join all original density variables to interaction data
 
 all.coeffs.with.phys<- westend %>%
   select(one_of(c(phys.vars,"period"))) %>%
   distinct() %>%
-  right_join(all.mod.coeffs.long,by="period")%>%
+  right_join(spp.only.mod.coeffs,by="period")%>%
   gather("external_forcing","ext_value",one_of(phys.vars))
 
-all.coeffs.with.phys %>%
-  filter(!is.na(type))%>%
-  ggplot(aes(ext_value,value))+
-  geom_point()+
-  geom_smooth()+
-  ylim(-2,2)+
-  labs(title="Physical forcing effect on species interactions",x="Normalized Index Value",y="Interaction Strength")+
-  facet_grid(type~external_forcing)+
-  theme_rockwell()
-
-# absolute value of interactions
-all.coeffs.with.phys %>%
-  filter(!is.na(type))%>%
-  mutate(absvalue=abs(value))%>%
-  ggplot(aes(ext_value,absvalue))+
-  geom_point()+
-  geom_smooth()+
-  labs(title="Physical forcing effect on species interactions",x="Normalized Index Value",y="Interaction Strength")+
-  facet_grid(type~external_forcing)+
-  theme_rockwell()
 ```
 
+### Effects on Individual Species
+
+With 10%/90% quantile regression. Columns/x-axis indicates the level of a physical stressor, while rows and y-axis denote the type of species interaction (corresponding to the colors in the boxplots above).
+
+```{r individual_effects,fig.height=6}
+
+phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
+  quants <- c(0.10,0.5,0.90)
+  plot_title <- namekey$long[match(spp,namekey$short)]
+  all.coeffs.with.phys %>%
+  filter(!is.na(type),mod==spp)%>%
+  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+    geom_point(col='gray30',alpha=0.7)+
+    geom_hline(yintercept = 0,linetype=2)+
+    geom_quantile(quantiles=quants,lineend = "round",size=1.5,formula=y~x)+
+    scale_color_manual(values=c('mac'="navyblue",'ymac'="gray50",'pter'="darkgreen",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),name="effect")+
+    labs(title=paste("Physical forcing effect on interactions with",plot_title),x="Normalized Index Value",y="Interaction Strength")+
+    facet_grid(type~external_forcing,scales = "free_y")+
+    theme_rockwell()
+})
+phys_effects_on_interactions[[1]]
+phys_effects_on_interactions[[2]]
+phys_effects_on_interactions[[3]]
+phys_effects_on_interactions[[4]]
+phys_effects_on_interactions[[5]]
+phys_effects_on_interactions[[6]]
+```
+
+Here are some notable effects/trends for each species:
+
+* *Mesocentrotus franciscanus*
+    + chance of competition with *Strongylocentrotus purpuratus* seems reduced under higher physical (wave) stress
+    + the same (reduced competition) is marginally true for nutrient-rich conditions (higher NPGO);and the opposite for nutrient- stressed conditions (higher MEI, PDO indices)
+    
+* *Strongylocentrotus purpuratus*
+    + "urchin competition" seems like a misnomer for this species; the effect of *Mesocentrotus franciscanus* on *S. purpuratus* is primarily positive across a range of physical conditions. The effect is dampened somewhat under increased wave disturbance
+    + Effect of *S. purpuratus* on itself ("population growth rate" in a way) is affected by oceanographic forcing: it is slightly increased under increased NPGO values and with increased disturbance, and slightly decreased under elevated MEI, PDO, and SST. 
+    
+* *Laminaria farlowii*
+    + as far as competition goes, most large, negative interactions are associated with juvenile *Macrocystis*, likely as an indicator of impending succesional processes (i.e., the juvenile *Macrocystis* growing into large *Macrocystis*). This expected negative effect is reduced under elevated PDO, disturbance, and SST, which makes sense: these are conditions that classically inhibit *Macrocystis* dominance[@Reed2011; @Cavanaugh2011; @Bell2015,@Young2015].
+    + In general, *M franciscanus* has a more negative effect on *Laminaria* than does *S. purpuratus*, and that effect is not overly sensitive to physical conditions, although the negative effect is dampened somewhat under elevated disturbance
+    + Physical conditions seem to strongly influence intraspecies *Laminaria* effects: the positive effect of *Laminaria* on its own density is reduced under elevated MEI, PDO, and SST, and increased under elevated NPGO and disturbance.
+
+* *Pterygophora californica*
+    + Algal effects: *Laminaria* is a good indicator of a positive density response of *Pterygophora*, while, as mentioned above (and surprisingly) the effect of *Macrocystis* is small. The positive effect of *Laminaria* increases with slightly with elevated NPGO and disturbance, and decreases with elevated MEI, PDO, and SST.
+    + Herbivory effects on *Pterygophora* vary with physical environment. *M. franciscanus* and *S. purpuratus* have similar mean effects on *Pterygophora*, but the effect of *M. franciscanus* is much more sensitive to physical conditions. Its negative effect is strongest under elevated disturbance and NPGO, while its effect is diminished under elevated MEI, PDO, and SST. The same trends hold for the effect of *S. purpuratus* on *Pterygophora*, but those effects are less sensitive.
+    + The variation in the intraspecies effect of *Pterygophora* is responsive to physical conditions in a similar manner to *Laminaria* (reduced under elevated MEI, PDO, and SST, and increased under elevated NPGO and disturbance)
+
+* *Macrocystis pyrifera*
+    + Because we have two variables measuring the density of different *Macrocystis* life stages, we can parse out the relative effects of physical conditions on adult vs. juvenile giant kelp.
+    + Environmental stress seems to strengthen the interactions between *Laminaria* and *Pterygophora* and *Macrocystis* recruits. Under conditions of elevated MEI, SST, or PDO, or decreased NPGO, the positive effect of *Pterygophora* and the negative effect of *Laminaria* on *Macrocystis* sporophytes are both enhanced. Similar is true for the adult *Macrocystis*: interactions between the giant kelp and the other algae species are elevated under nutrient- or temperature-stressed conditions. Increased wave height (physical disturbance) seems to enhance the negative effect of *Pterygophora* on *Macrocystis* adults.
+    + The effect of purple urchin on both *Macrocystis* adult and juvenile density is stronger than the red urchin effect, and more variable with changing conditions. Purple urchin herbivory as a negative influence on *Macrocystis* is enhanced with elevated disturbance, MEI, and PDO, and slightly reduced with an increase in the NPGO.
+    + The strenghts of intraspecies effects (effects of *Macrocystis* adults on juveniles and vice versa) are also influenced by physical conditions, but perhaps in a different way than might be expected. The positive effect of juvenile *Macrocystis* on adult *Macrocystis* seems to be **enhanced** under nutrient-stressed conditions and higher temperatures, and reduced with greater nutrient availability and increased disturbance.
+
+### Summarized effects of different physical conditions
+
+* **Large-scale oceanographic oscillations: NPGO, MEI, and PDO**
+    + Higher nutrient availability often associated with higher values of the NPGO, and lower values of the MEI and PDO.
+    + High nutrient availability leads to higher urchin growth rates and reduced competition between urchin species. *Laminaria* and *Pterygophora* intraspecific effects are enhanced, while the *Macrocystis* intraspecies effect is reduced. The negative effect of herbivory is strengthened for *Pterygophora*, but reduced for *Macrocystis*. The ability of *Pterygophora* and *Laminaria* to compete with *Macrocystis* is reduced under greater nutrient availability, as evidenced by a decrease in interaction strength between the two understory species and the giant kelp, as well as an increase in the positive association of the two with each other, likely as a mutual defense against *Macrocystis* dominance.
+    + The opposite of the above effects are true for nutrient-scarce conditions. High values of the MEI and PDO, and low values of the NPGO, are associated with reduced urchin growth and marginally increased urchin competition. The negative effect of herbivory is reduced for *Pterygophora*, but exacerbated for *Macrocystis*. The understory species are favored in algal competition, in that their negative effects on *Macrocystis* are strengthened, and the converse effects of *Macrocystis* on the understory are reduced. Interestingly, *Pterygophora* seems beneficial for *Macrocystis* recruitment under nutrient-stressed conditions, while *Laminaria* is inhibitory. The *Laminaria* intraspecies effect is reduced, while the intraspecies *Macrocystis* effect is enhanced.
+    + The qualitative story to be told here is that under nutrient-poor conditions, a *Pterygophora* state is favored in a relative sense over a *Macrocystis* dominant state. Under nutrient-stressed conditions, *Pterygophora* is more resistant to herbivory, and more inhibitory to adult *Macrocystis*. However, *Pterygophora* is beneficial for *Macrocystis* recruitment, while *Laminaria* inhibits *Macrocystis* recruitment under nutrient stressed conditions. When conditions are "better" (more nutrients), *Macrocystis* gains. It becomes more able to withstand herbivory, less sensitive to *Pterygophora* or *Laminaria* presence, and more inhibitory to *Pterygophora*.
+    
+* **Temperature**
+    + Elevated SST has similar effects to nutrient stress (elevated MEI and PDO, and reduced NPGO), which makes sense: In Southern California, elevated SST is associated with reduced nutrient availability[@Zimmerman1984,@Bell2015]. Similar effects as described above for nutrient stress hold for elevated temperature.
+    
+* **Physical disturbance**
+    + Higher max wave heights was our proxy for physical stress/disturbance.
+    + Higher physical disturbance levels results in reduced interaction strength between the urchin species.
+    + *Pterygophora*'s competitive ability is enhanced with increased disturbance[@Dayton1999], evidenced by an increase in the negative effect of *Pterygophora* on adult *Macrocystis*.
+    + *Pterygophora* and *Macrocystis* are both subject to a greater negative effect of herbivory under increased disturbance.
+    + *Laminaria* benefits as well. The negative effects of herbivory and algal competition are reduced with increased disturbance, and its intraspecies effect is strengthened.
+    + The positive effect of juvenile on adult *Macrocystis* is reduced with increased physical stress.
+    
 ## References

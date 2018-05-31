@@ -22,6 +22,16 @@ require(quantreg)
 require(knitr)
 require(kableExtra)
 require(extrafont)
+
+# plot theme
+plot_theme <-   theme_minimal()+
+  theme(text=element_text(family="Rockwell",size=12,color="black"),
+        legend.text = element_text(size=14),
+        axis.title=element_text(family="Rockwell",size=14,color="black"),
+        axis.text=element_text(family="Rockwell",size=8,color="black"),
+        strip.background = element_rect(colour="black"),
+        panel.border = element_rect(color="black",fill=NA))
+theme_set(plot_theme)
 ```
 
 ## Introduction
@@ -140,21 +150,12 @@ westend.mean_dens_plot <- westend.meandens %>%
       scale_color_manual(values=c("navyblue","gray50","darkgreen","darkcyan","mediumpurple4","darkred"),
                          guide=guide_legend(title="Species",override.aes = list(size=1)))+
       guides(linetype="none")+
-      theme_minimal()+
-      theme(text = element_text(family="Rockwell",size=16),
+      theme(text = element_text(size=16),
             legend.position = c(0.15,0.8),
             legend.text = element_text(size=12))
 westend.mean_dens_plot
 rm(pd,period.key,periods.first,westend.long,westend.meandens)
 
-#ggplot theme to apply to plots later
-theme_rockwell <- function() {
-  theme_minimal()+
-  theme(text=element_text(family="Rockwell",size=12),
-        axis.title = element_text(family="Rockwell",size=14),
-        strip.background = element_rect(colour="black"),
-        panel.border = element_rect(color="black",fill=NA))
-}
 ```
 
 ***
@@ -194,23 +195,28 @@ In descriptive terms, this is akin to asking, "When the system has been in a sta
 
 By varying the value of *E*, we can determine what the best embedding dimension is for each variable in our analysis, essentially a proxy for the number of variables that best "unfolds" or best represents the shadow attractor. We can measure the skill of an embedding by comparing the estimated forecasts $\it{\bf{\hat{x}_{t+1}}}$ with the observed values $\it{\bf{x_{t+1}}}$, and we report it with $\it{\bf{\rho}}$, the Pearson correlation coefficient between predictions and observations. To avoid in-sample fitting, we use a leave-one-out cross-validation scheme, removing one vector at a time from the library, and predicting its dynamics from the other library vectors.
 
-```{r univariate simplex westend,fig.height=10,fig.width=7,echo=F}
+```{r univariate simplex westend,fig.width=7,echo=F}
 # List to store output of simplex projection
 westend.simp.list <- list()
 
 # Run simplex projection for each species at each site, and plot output
-par(mfrow=c(3,2))
 for(i in 1:length(study_spp)) {
   spp <- study_spp[i]
   dat <- westend %>% select(matches(spp)) %>% as.data.frame()
-  out <- simplex(as.numeric(dat[,1]),lib=as.matrix(westend.segs),E=2:15,silent=T)
+  out <- simplex(as.numeric(dat[,1]),lib=as.matrix(westend.segs),E=2:15,silent=T) %>%
+    mutate(spp=namekey$long[match(spp,namekey$short)])
   westend.simp.list[[spp]] <- out
-  
-  # Plot embedding dimension vs. predictive ability (rho)
-  plot(out$E,out$rho,type="l",main=namekey$long[match(spp,namekey$short)],
-       ylim=c(0,1),
-       xlab="Embedding Dimension (E)",ylab=expression(paste("Skill, ",rho)))
 }
+
+# plot
+bind_rows(westend.simp.list) %>%
+  ggplot(aes(E,rho,color=spp))+
+  geom_line(size=2)+
+  facet_wrap(~spp,nrow=2,scales="free_y")+
+  labs(x="Embedding Dimension (E)",y=expression(paste("Skill, ",rho)))+
+  scale_x_continuous(breaks=seq(0,12,by=2))+
+  scale_color_manual(values=c('Macrocystis >1m'="navyblue",'Macrocystis <1m'="gray50",'Pterygophora'="darkgreen",'Laminaria'="darkcyan",'Purple urchin'="mediumpurple4",'Red urchin'="darkred"),name="")+
+  guides(color=F)
 
 # Save best embedding dimensions
 westend.bestE <- sapply(westend.simp.list,function(x) {
@@ -232,13 +238,22 @@ phys.simp.list <- list()
 for(i in 1:length(phys.vars)) {
   ind <- phys.vars[i]
   dat <- westend %>% select(matches(ind)) %>% as.data.frame()
-  out <- simplex(as.numeric(dat[,1]),lib=c(1,69),E=2:10,silent=T)
+  out <- simplex(as.numeric(dat[,1]),lib=c(1,69),E=2:10,silent=T) %>%
+    mutate(spp=namekey$long[match(ind,namekey$short)])
   phys.simp.list[[ind]] <- out
   westend.simp.list[[ind]] <- out
-
-  # Plot embedding dimension vs. predictive ability (rho)
-  plot(out$E,out$rho,type="l",main=namekey$long[match(ind,namekey$short)],xlab="Embedding Dimension (E)",ylab=expression(paste("Skill, ",rho)))
 }
+
+# plot
+bind_rows(phys.simp.list) %>%
+  ggplot(aes(E,rho))+
+  geom_line(size=2)+
+  facet_wrap(~spp,nrow=2,scales="free_y")+
+  labs(x="Embedding Dimension (E)",y=expression(paste("Skill, ",rho)))+
+  scale_x_continuous(breaks=seq(0,10,by=2))+
+  guides(color=F)+
+  theme(strip.text = element_text(size=8))
+
 rm(ind,dat,out)
 phys.bestE <- sapply(phys.simp.list,function(x) {
   temp <- x %>% filter(!is.na(rho))
@@ -254,7 +269,7 @@ westend.bestE <- c(westend.bestE,phys.bestE)
 
 We also want to look at prediction decay for each variable, which is one piece of evidence that a dynamic system is nonlinear. Using the best *E* identified in the previous step, we attempt to make predictions increasing far into the future, instead of just one period ahead. A nonlinear system should show decreasing predictive power with increasing prediction horizon[@Sugihara1994]. This phenomenon is a property of deterministic chaos and is analagous to the "butterfly effect", where in a nonlinear system, trajectories in state-space are expected to diverge over time. To examine this effect, we hold *E* constant, and proceed with simplex projection as before, but varying the prediction horizon, $t_p$ (i.e., how many steps ahead we try to predict).
 
-```{r prediction horizon test,message=F,echo=F,fig.height=10,fig.width=7,echo=F}
+```{r prediction horizon test,message=F,echo=F,fig.width=7,echo=F}
 # List to hold prediction horizon results
 westend.tp.list <- list()
 
@@ -262,16 +277,25 @@ par(mfrow=c(3,2))
 for(i in 1:length(study_spp)) {
   spp <- study_spp[i]
   dat <- westend %>% select(matches(spp)) %>% as.data.frame()
-  out <- simplex(as.numeric(dat[,1]),lib=as.matrix(westend.segs),silent=T,E=westend.bestE[spp],tp=1:10)
+  out <- simplex(as.numeric(dat[,1]),lib=as.matrix(westend.segs),silent=T,E=westend.bestE[spp],tp=1:10) %>%
+    mutate(spp=namekey$long[match(spp,namekey$short)])
   westend.tp.list[[spp]] <- out
-  
-  # Plot time horizon vs. predictive ability (rho)
-  plot(out$tp,out$rho,type="l",main=namekey$long[match(spp,namekey$short)],xlab="Time to Prediction",ylab=expression(paste("Skill, ",rho)))
 }
+
+#Plot time horizon vs. rho
+bind_rows(westend.tp.list) %>%
+  ggplot(aes(tp,rho,color=spp))+
+  geom_line(size=2)+
+  facet_wrap(~spp,nrow=2,scales="free_y")+
+  labs(x="Time to Prediction",y=expression(paste("Skill, ",rho)))+
+  scale_color_manual(values=c('Macrocystis >1m'="navyblue",'Macrocystis <1m'="gray50",'Pterygophora'="darkgreen",'Laminaria'="darkcyan",'Purple urchin'="mediumpurple4",'Red urchin'="darkred"),name="")+
+  scale_x_continuous(breaks=seq(0,10,by=2))+
+  guides(color=F)
+
 rm(spp,dat,out)
 ```
 
-The prediction horizon effect check is promising overall, as most variables decline in predictive ability with increasing time horizon. For *Pterygophora californica*, there is some evidence of cyclic behavior, in that dynamics are more predictable 6 periods in the future than 3 or 4 periods. This is something to be mindful of, but we leave *Pterygophora* in our analysis for now.
+The prediction horizon effect check is promising overall, as most variables decline in predictive ability with increasing time horizon. For *Pterygophora californica*, *Macrocystis* juveniles, and *Laminaria*, there is some evidence of cyclic behavior, in that dynamics are more predictable 6 periods in the future than 3 or 4 periods.
 
 ***
 
@@ -285,19 +309,27 @@ As a side note, with $\it{\bf{\theta}}>0$, although the set library vectors rema
 
 For prediction of each variable using S-maps, we can again use the optimal embedding dimension, *E*, found through our simplex projection above, and we plot the tuning parameter $\it{\bf{\theta}}$ against $\it{\bf{\rho}}$ to look for evidence of nonlinear dynamics.
 
-```{r univariate s_maps westend,fig.height=10,fig.width=7,echo=F}
+```{r univariate s_maps westend,fig.width=7,echo=F}
 westend.smap.list <- list() # list to store output
 
 par(mfrow=c(3,2))
 for(i in 1:length(study_spp)) {
   spp <- study_spp[i]
   dat <- westend %>% select(matches(spp)) %>% as.data.frame()
-  out <- s_map(as.numeric(dat[,1]),lib=as.matrix(westend.segs),E=westend.bestE[spp],silent=T)
+  out <- s_map(as.numeric(dat[,1]),lib=as.matrix(westend.segs),E=westend.bestE[spp],silent=T) %>%
+    mutate(spp=namekey$long[match(spp,namekey$short)])
   westend.smap.list[[spp]] <- out
-  
-  # Plot theta dimension vs. predictive ability (rho)
-  plot(out$theta,out$rho,type="l",main=namekey$long[match(spp,namekey$short)],xlab=expression(paste("Nonlinearity (",theta,")")), ylab=expression(paste("Skill, ",rho)))
 }
+
+bind_rows(westend.smap.list) %>%
+  ggplot(aes(theta,rho,color=spp))+
+  geom_line(size=2)+
+  facet_wrap(~spp,nrow=2,scales="free_y")+
+  labs(x=expression(paste("Nonlinearity (",theta,")")),y=expression(paste("Skill, ",rho)))+
+  scale_color_manual(values=c('Macrocystis >1m'="navyblue",'Macrocystis <1m'="gray50",'Pterygophora'="darkgreen",'Laminaria'="darkcyan",'Purple urchin'="mediumpurple4",'Red urchin'="darkred"),name="")+
+  scale_x_continuous(breaks=seq(0,8,by=2))+
+  guides(color=F)
+
 rm(spp,dat,out)
 ```
 
@@ -344,7 +376,7 @@ for(i in 1:n_row) {
     if(i != j) {
       # remember, we use the best embedding dimension for the target variable (the variable we're cross-mapping to, i.e. the putative forcing variable)
       tempE=westend.bestE[col_names[j]]
-      temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 2+j,lib_sizes = c(10,500),num_samples=100,replace=T,silent=T)
+      temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 2+j,lib_sizes = c(10,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
       # mean rho at library size 500
       rhomean <- temp %>% filter(lib_size==500) %>% ccm_means()
       westend.xmap_mat[i,j] <- rhomean$rho
@@ -606,8 +638,7 @@ all.mod.coeffs.plot.box <- all.mod.coeffs.long %>%
   ylim(-2,2)+
   coord_flip()+
   labs(y="Estimated Interaction Coefficient",x="Interacting Species")+
-  facet_grid(mod_plotting_name~.,scales="free",space="free")+
-  theme_rockwell()
+  facet_grid(mod_plotting_name~.,scales="free",space="free")
 
 all.mod.coeffs.plot.box
 # ggsave("all_spp_coffs.png",plot=all.mod.coeffs.plot.box,height=8,width=7.5)
@@ -657,7 +688,6 @@ all.phys.coeffs.plot <- all.mod.coeffs.long %>%
   labs(y="Estimated Interaction Coefficient",x="Physical Forcing")+
   facet_grid(mod_plotting_name~.)+
   geom_text(aes(x=1.5,y=2,label=label),hjust=1,family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
-  theme_rockwell()+
   theme(strip.background = element_blank(),
         strip.text = element_blank())
 all.phys.coeffs.plot
@@ -759,8 +789,7 @@ spp.only.mod.coeffs.plot.box <- spp.only.mod.coeffs %>%
   ylim(-2,2)+
   coord_flip()+
   labs(y="Estimated Interaction Coefficient",x="Interacting Species")+
-  facet_grid(mod_plotting_name~.,scales="free_y",space="free")+
-  theme_rockwell()
+  facet_grid(mod_plotting_name~.,scales="free_y",space="free")
 
 spp.only.mod.coeffs.plot.box
 # ggsave("spp_only_mods_coeffs.png",plot=spp.only.mod.coeffs.plot.box,height=8,width=7.5)
@@ -795,8 +824,7 @@ phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
     geom_quantile(quantiles=quants,lineend = "round",size=1.5,formula=y~x)+
     scale_color_manual(values=c('mac'="navyblue",'ymac'="gray50",'pter'="darkgreen",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),name="effect")+
     labs(title=paste("Physical forcing effect on interactions with",plot_title),x="Normalized Index Value",y="Interaction Strength")+
-    facet_grid(type~external_forcing,scales = "free_y")+
-    theme_rockwell()
+    facet_grid(type~external_forcing,scales = "free_y")
 })
 phys_effects_on_interactions[[1]]
 phys_effects_on_interactions[[2]]
@@ -817,14 +845,15 @@ Here are some notable effects/trends for each species:
     + Effect of *S. purpuratus* on itself ("population growth rate" in a way) is affected by oceanographic forcing: it is slightly increased under increased NPGO values and with increased disturbance, and slightly decreased under elevated MEI, PDO, and SST. 
     
 * *Laminaria farlowii*
-    + as far as competition goes, most large, negative interactions are associated with juvenile *Macrocystis*, likely as an indicator of impending succesional processes (i.e., the juvenile *Macrocystis* growing into large *Macrocystis*). This expected negative effect is reduced under elevated PDO, disturbance, and SST, which makes sense: these are conditions that classically inhibit *Macrocystis* dominance[@Reed2011; @Cavanaugh2011; @Bell2015,@Young2015].
+    + Important to note that no physical variables in this analysis showed a causal signal for *Laminaria* from CCM
+    + as far as competition goes, most large, negative interactions are associated with juvenile *Macrocystis*, likely as an indicator of impending successional processes (i.e., the juvenile *Macrocystis* growing into large *Macrocystis*). This expected negative effect is reduced under elevated PDO, disturbance, and SST, which makes sense: these are conditions that classically inhibit *Macrocystis* dominance[@Reed2011; @Cavanaugh2011; @Bell2015,@Young2015].
     + In general, *M franciscanus* has a more negative effect on *Laminaria* than does *S. purpuratus*, and that effect is not overly sensitive to physical conditions, although the negative effect is dampened somewhat under elevated disturbance
     + Physical conditions seem to strongly influence intraspecies *Laminaria* effects: the positive effect of *Laminaria* on its own density is reduced under elevated MEI, PDO, and SST, and increased under elevated NPGO and disturbance.
 
 * *Pterygophora californica*
-    + Algal effects: *Laminaria* is a good indicator of a positive density response of *Pterygophora*, while, as mentioned above (and surprisingly) the effect of *Macrocystis* is small. The positive effect of *Laminaria* increases with slightly with elevated NPGO and disturbance, and decreases with elevated MEI, PDO, and SST.
-    + Herbivory effects on *Pterygophora* vary with physical environment. *M. franciscanus* and *S. purpuratus* have similar mean effects on *Pterygophora*, but the effect of *M. franciscanus* is much more sensitive to physical conditions. Its negative effect is strongest under elevated disturbance and NPGO, while its effect is diminished under elevated MEI, PDO, and SST. The same trends hold for the effect of *S. purpuratus* on *Pterygophora*, but those effects are less sensitive.
-    + The variation in the intraspecies effect of *Pterygophora* is responsive to physical conditions in a similar manner to *Laminaria* (reduced under elevated MEI, PDO, and SST, and increased under elevated NPGO and disturbance)
+    + Algal effects: *Macrocystis* has a near-zero mean effect on *Pterygophora*. However, the quantile regression suggests that *Macrocystis* can have a strong negative effect on *Pterygophora* at lower relative levels of nutrient and temperature stress (high NPGO, low MEI and PDO, lower SST), and potentially after disturbance.
+    + Herbivory effects on *Pterygophora* vary with physical environment. *M. franciscanus* and *S. purpuratus* have similar mean effects on *Pterygophora*, and that herbivory is sensitive to physical conditions. The effect of herbivory is strongest under elevated disturbance and NPGO, and diminished under elevated MEI, PDO, and SST.
+    + Little variation in the intraspecies effect of *Pterygophora* along physical gradients.
 
 * *Macrocystis pyrifera*
     + Because we have two variables measuring the density of different *Macrocystis* life stages, we can parse out the relative effects of physical conditions on adult vs. juvenile giant kelp.

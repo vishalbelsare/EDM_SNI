@@ -11,7 +11,7 @@ editor_options:
 
 ```{r global_options, include=F,message=F}
 require(knitr)
-knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE,results = 'asis')
 ```
 
 ```{r setup, include=FALSE,message=F}
@@ -351,7 +351,7 @@ We can use CCM theory to ensure that the species in our data are actually displa
 
 ***
 
-```{r ccm all species and physical vars, echo=F,warning=F}
+```{r ccm all species and physical vars, echo=F,warning=F,fig.width=7}
 # Rows hold predicted variables, columns hold forcing variables. There are more columns than rows since the physical variables are included as potential forcing factors.
 n_col <- dim(westend)[2]-2
 n_row <- dim(westend)[2]-7
@@ -461,7 +461,7 @@ westend.causal.vars <- causal_vars(westend.ptot.mat,vars=c("mac","purp","lam","y
 
 The CCM results translated into an empirical interaction web looks like this:
 
-```{r igraph, echo=F, message=F,warning=F}
+```{r igraph, echo=F, message=F,warning=F,fig.height=6}
 require(igraph) # R Package for network graphing and analysis
 
 # Add NAs for connections in to physical variables (since we want them just to be exogenous)
@@ -485,15 +485,15 @@ V(g)$label <- paste(sep="\n",V(g)$name, vert_out_in)
 V(g)$label[7:11] <- paste(V(g)$name[7:11])
 
 #vertex coordinates
-crds <- cbind(c(300,240,375,313,158,122,430,203,146.3342,309,20),c(10,126,102,206,204,85,162.8175,0,314.3077,318,232.6699))
+crds <- cbind(c(116.0000, 318.0000, 177.0000, 581.0000, 346.0000, 385.0000, 331.1627, 151.8379, 573.0000, 539.0000,  45.0000),c(0.0000, 186.0000, 362.0000, 172.0000,  40.0000, 374.0000, 537.0000, 504.2360, 35.0000, 406.0000, 288.4111))
 
 # vector of node colors for plotting
 vert.cols <- c(rep("tan3",3),rep("orchid3",2),"tan3",rep("gray70",5))
 
-plot(g,asp=0.8, vertex.label.color="black", vertex.label.cex=0.8, edge.arrow.size=0.6,vertex.label.font=2, vertex.size=40,edge.lty=2,edge.color="black",vertex.color=vert.cols,layout=crds,vertex.frame.color=F,main="",edge.curved=F)
+plot(g,asp=0.8, vertex.label.color="black", vertex.label.cex=0.8, edge.arrow.size=0.6,vertex.label.font=2, vertex.shape="circle", edge.curved=F,margin=0, vertex.size=30,rescale=T,edge.lty=1,edge.color="gray40",layout=crds,vertex.color=vert.cols,vertex.frame.color=NA,main="")
 ```
 
-In this network, each node represents a variable, and the numbers associated with each are the number of causal connections in the web, outgoing and (incoming). The maximum number of outgoing interactions is 5 (6 total biological variables minus the variable itself), and incoming is 10 (5 biological and 5 physical variables). Algae species are in brown, while the two urchin species are in purple and the physical driver are in grey. For example, as mentioned above, we can see that young *Macrocystis* is forced by all other variables in the system, but only itself shows a causal forcing on 3 of the 5 other biological variables. Again we can see that while the web is not entirely saturated, there are many unidirectional forcings, and a lot of bidirectional causation as well (A forces B *and* B forces A).
+In this network, each node represents a variable, and the numbers associated with each are the number of causal connections in the web, outgoing and (incoming). The maximum number of outgoing interactions is 5 (6 total biological variables minus the variable itself), and incoming is 10 (5 biological and 5 physical variables). Algae species are in brown, while the two urchin species are in purple and the physical drivers are in grey. For example, as mentioned above, we can see that young *Macrocystis* (denoted M. pyr (j))is forced by all other variables in the system, but only itself shows a causal forcing on 4 of the 5 other biological variables. Again we can see that while the web is not entirely saturated, there are many unidirectional forcings, and a prevalence of bidirectional causation as well (A forces B *and* B forces A). The adult *Macrocystis* is causally connected to all variables in the analysis.
 
 ***
 
@@ -811,7 +811,7 @@ all.coeffs.with.phys<- westend %>%
 
 With 10%/90% quantile regression. Columns/x-axis indicates the level of a physical stressor, while rows and y-axis denote the type of species interaction (corresponding to the colors in the boxplots above).
 
-```{r individual_effects,fig.height=6}
+```{r individual_effects,fig.width=7}
 
 phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
   quants <- c(0.10,0.5,0.90)
@@ -819,9 +819,9 @@ phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
   all.coeffs.with.phys %>%
   filter(!is.na(type),mod==spp)%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-    geom_point(col='gray30',alpha=0.7)+
+    geom_point(col='gray20',alpha=0.6)+
     geom_hline(yintercept = 0,linetype=2)+
-    geom_quantile(quantiles=quants,lineend = "round",size=1.5,formula=y~x)+
+    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
     scale_color_manual(values=c('mac'="navyblue",'ymac'="gray50",'pter'="darkgreen",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),name="effect")+
     labs(title=paste("Physical forcing effect on interactions with",plot_title),x="Normalized Index Value",y="Interaction Strength")+
     facet_grid(type~external_forcing,scales = "free_y")

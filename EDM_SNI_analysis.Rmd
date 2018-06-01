@@ -152,7 +152,8 @@ westend.mean_dens_plot <- westend.meandens %>%
       guides(linetype="none")+
       theme(text = element_text(size=16),
             legend.position = c(0.15,0.8),
-            legend.text = element_text(size=12))
+            legend.text = element_text(size=12),
+            panel.border = element_blank())
 westend.mean_dens_plot
 rm(pd,period.key,periods.first,westend.long,westend.meandens)
 
@@ -233,12 +234,11 @@ westend.bestE["pter"] <- 6
 rm(spp,dat,out)
 
 # Run simplex for each physical variable
-par(mfrow=c(3,2))
 phys.simp.list <- list()
 for(i in 1:length(phys.vars)) {
   ind <- phys.vars[i]
   dat <- westend %>% select(matches(ind)) %>% as.data.frame()
-  out <- simplex(as.numeric(dat[,1]),lib=c(1,69),E=2:10,silent=T) %>%
+  out <- simplex(as.numeric(dat[,1]),lib=c(1,63),E=2:10,silent=T) %>%
     mutate(spp=namekey$long[match(ind,namekey$short)])
   phys.simp.list[[ind]] <- out
   westend.simp.list[[ind]] <- out
@@ -617,8 +617,84 @@ all.mod.coeffs.long %>%
 
 ## 5. Results
 
-### Multivariate Model Output: Species interactions
+### Multivariate Attractors
 
+The multivariate models reconstruct attractors for each species based on their causally linked variables from CCM. A visualization of those models in state space might look something like this:
+
+```{r 3d plot,fig.height=6}
+require(plot3D)
+
+x <- westend$lam
+y <- westend$mac
+z <- westend$purp
+
+seg.start <- as.numeric(westend.segs[1,1])
+seg.end <- as.numeric(westend.segs[1,2])
+
+#smooth
+t <- 1:length(seg.start:seg.end)
+tt<-seq(1,length(seg.start:seg.end),len=500)
+
+xsmooth<-splinefun(t, x[seg.start:seg.end])(tt)
+ysmooth<-splinefun(t, y[seg.start:seg.end])(tt)
+zsmooth<-splinefun(t, z[seg.start:seg.end])(tt)
+
+xtemp <- x[seg.start:seg.end]
+ytemp <- y[seg.start:seg.end]
+ztemp <- z[seg.start:seg.end]
+
+# plot
+
+scatter3D(xsmooth,ysmooth,zsmooth, col="gray30",
+          type="l",phi=40,theta=20,bty="b",xlab = "Laminaria", ylab = "Macrocystis", zlab = "Purple Urchin")
+points3D(xsmooth,ysmooth,zsmooth,col="black",pch=19,cex=0.5,add=T)
+
+for(i in 2:5) {
+  seg.start <- as.numeric(westend.segs[i,1])
+  seg.end <- as.numeric(westend.segs[i,2])
+  
+  #smooth
+  t <- 1:length(seg.start:seg.end)
+  tt<-seq(1,length(seg.start:seg.end),len=500)
+  xsmooth<-splinefun(t, x[seg.start:seg.end])(tt)
+  ysmooth<-splinefun(t, y[seg.start:seg.end])(tt)
+  zsmooth<-splinefun(t, z[seg.start:seg.end])(tt)
+  
+  xtemp <- x[seg.start:seg.end]
+  ytemp <- y[seg.start:seg.end]
+  ztemp <- z[seg.start:seg.end]
+  
+  # plot
+  
+  scatter3D(xsmooth,ysmooth,zsmooth, col="gray30",
+            type="l",phi=40,bty="b",add=T)
+  points3D(xtemp,ytemp,ztemp,col="black",pch=19,cex=0.5,add=T)
+}
+
+scatter3D(x[46],y[46],z[46],col="red",pch=19,cex=2,add=T)
+
+#manually find nearest neighbors to point 46
+require(RANN)
+temp <- westend %>% select(lam,mac,purp) %>% slice(1:315) %>% mutate(id=row_number()) %>%
+  filter(!is.na(lam))
+tempnn <-nn2(temp[,1:3],k=4)$nn.idx %>% as.data.frame()
+names(tempnn) <- c("nn1","nn2","nn3","nn4")
+temp <- bind_cols(temp,tempnn)
+
+scatter3D(x[109],y[109],z[109],col="darkgreen",pch=19,cex=2,add=T)
+scatter3D(x[235],y[235],z[235],col="darkgreen",pch=19,cex=2,add=T)
+scatter3D(x[169],y[169],z[169],col="darkgreen",pch=19,cex=2,add=T)
+
+scatter3D(x[110],y[110],z[110],col="blue",pch=19,cex=2,add=T)
+scatter3D(x[236],y[236],z[236],col="blue",pch=19,cex=2,add=T)
+scatter3D(x[170],y[170],z[170],col="blue",pch=19,cex=2,add=T)
+
+rm(xsmooth,ysmooth,zsmooth,xtemp,ytemp,ztemp,t,tt,seg.start,seg.end,x,y,z,temp)
+```
+
+***
+
+### Multivariate Model Output: Species interactions
 
 We can pull from the models every predicted interaction between species. These fitted interaction strengths are specifically the estimated effect of the density of one species on itself or another species, when forecasting one monitoring period (approximately six months) ahead. For example, each data point for *Pterygophora* in the *Macrocystis* model is the predicted effect of the current density of Pterygophora on the density of Macrocystis in the next monitoring period. Mathematically, each interaction measured is a partial derivative, or element of our sequentially calculated Jacobian matrices, estimating the effect of one species on another, $\delta N_{1}/\delta N_{2}$. The distributions of those interactions are shown in the figure below.
 
@@ -807,22 +883,24 @@ all.coeffs.with.phys<- westend %>%
 
 ```
 
+***
+
 ### Effects on Individual Species
 
-With 10%/90% quantile regression. Columns/x-axis indicates the level of a physical stressor, while rows and y-axis denote the type of species interaction (corresponding to the colors in the boxplots above).
+With 5%/95% quantile regression. Columns/x-axis indicates the normalized level of a physical stressor, while rows and y-axis denote the type of species interaction (corresponding to the colors in the boxplots above).
 
 ```{r individual_effects,fig.width=7}
 
 phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
-  quants <- c(0.10,0.5,0.90)
+  quants <- c(0.05,0.5,0.95)
   plot_title <- namekey$long[match(spp,namekey$short)]
   all.coeffs.with.phys %>%
   filter(!is.na(type),mod==spp)%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-    geom_point(col='gray20',alpha=0.6)+
+    geom_point(col='gray60',alpha=0.6)+
     geom_hline(yintercept = 0,linetype=2)+
     geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-    scale_color_manual(values=c('mac'="navyblue",'ymac'="gray50",'pter'="darkgreen",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),name="effect")+
+    scale_color_manual(values=c('mac'="navyblue",'ymac'="gray30",'pter'="darkgreen",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),name="effect")+
     labs(title=paste("Physical forcing effect on interactions with",plot_title),x="Normalized Index Value",y="Interaction Strength")+
     facet_grid(type~external_forcing,scales = "free_y")
 })

@@ -426,6 +426,7 @@ westend.xmap_all_plot <- ggplot(westend.xmap_rast,aes(x=force.name,y=pred.name,f
   theme(axis.text.x=element_text(angle = 90, hjust = 1,vjust=0.1))
 
 westend.xmap_all_plot
+# ggsave("plots/ccm_all.png",plot=westend.xmap_all_plot)
 ```
 
 The plot shows cross-mapped (predictor, or forcing) variables in the columns, while rows are predicted variables (i.e., columns cause rows). Gray indicates a lack of significant causal signal--failure to satisfy one of the above criteria--and darker colors represent higher cross-map skill.
@@ -729,7 +730,7 @@ all.mod.coeffs.plot.box <- all.mod.coeffs.long %>%
   facet_grid(mod_plotting_name~.,scales="free",space="free")
 
 all.mod.coeffs.plot.box
-# ggsave("all_spp_coffs.png",plot=all.mod.coeffs.plot.box,height=8,width=7.5)
+# ggsave("plots/all_spp_coeffs.png",plot=all.mod.coeffs.plot.box,height=8,width=7.5)
 ```
 
 These are box-and-whisker plots of estimated species interaction strengths from S-map models for the five focal species (panels top to bottom): *Macrocystis* adults, *Macrocystis* juveniles, *Pterygophora*, *Laminaria*, purple urchin, and red urchin. Each colored box represents the distribution of all estimated interaction coefficients (x-axis) of an interacting or forcing species (left y-axis) on a modeled species (right y-axis) across all data for a given model (white triangles: mean; vertical lines: median; box: interquartile range; whiskers extend to data point at most $1.5*IQR$ from the box). Correlation coefficient between predictions and observations denoted for each model. Color denotes hypothesized interaction type, including interspecific competition (between algae species or between urchin species), herbivory (urchin effect on algae), consumption (algae effect on urchins), and intraspecies interaction (the estimated interaction of a species with itself). Abbreviations: S. pur, *Strongylocentrotus purpuratus*; P cal., *Pterygophora californica*; M. pyr, *Macrocystis pyrifera*; M. fra, *Mesocentrotus franciscanus*; L. far, *Laminaria farlowii*.
@@ -779,6 +780,7 @@ all.phys.coeffs.plot <- all.mod.coeffs.long %>%
   theme(strip.background = element_blank(),
         strip.text = element_blank())
 all.phys.coeffs.plot
+# ggsave("plots/phys_coeffs.png",plot=all.phys.coeffs.plot)
 ```
 
 In this figure, each box represents the distribution of estimated effect of a physical driver (left y-axis) on the modeled species across all data for a given model. Empty rows indicate physical variables that were not included in specific species models because of a lack of a causal signal from our CCM. Abbreviations: SWH, significant wave height; SST, sea surface temperature; PDO, Pacific Decadal Oscillation; NPGO, North Pacific Gyre Oscillation; MEI, Multivariate ENSO Index.
@@ -880,7 +882,7 @@ spp.only.mod.coeffs.plot.box <- spp.only.mod.coeffs %>%
   facet_grid(mod_plotting_name~.,scales="free_y",space="free")
 
 spp.only.mod.coeffs.plot.box
-# ggsave("spp_only_mods_coeffs.png",plot=spp.only.mod.coeffs.plot.box,height=8,width=7.5)
+# ggsave("plots/spp_only_mods_coeffs.png",plot=spp.only.mod.coeffs.plot.box,height=8,width=7.5)
 ```
 
 ```{r mean interactions, fig.height=8,fig.width=7.5}
@@ -922,12 +924,21 @@ phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
           plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"),
         )
 })
+ggsave("plots/phys_effects_red.png",plot=phys_effects_on_interactions[[1]])
+ggsave("plots/phys_effects_purp.png",plot=phys_effects_on_interactions[[2]])
+ggsave("plots/phys_effects_lam.png",plot=phys_effects_on_interactions[[3]])
+ggsave("plots/phys_effects_pter.png",plot=phys_effects_on_interactions[[4]])
+ggsave("plots/phys_effects_mac.png",plot=phys_effects_on_interactions[[5]])
+ggsave("plots/phys_effects_ymac.png",plot=phys_effects_on_interactions[[6]])
+
 phys_effects_on_interactions[[1]]
 phys_effects_on_interactions[[2]]
 phys_effects_on_interactions[[3]]
 phys_effects_on_interactions[[4]]
 phys_effects_on_interactions[[5]]
 phys_effects_on_interactions[[6]]
+
+
 ```
 
 Here are some notable effects/trends for each species:

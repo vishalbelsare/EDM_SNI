@@ -27,10 +27,25 @@ require(extrafont)
 plot_theme <-   theme_minimal()+
   theme(text=element_text(family="Rockwell",size=12,color="black"),
         legend.text = element_text(size=14),
-        axis.title=element_text(family="Rockwell",size=14,color="black"),
-        axis.text=element_text(family="Rockwell",size=8,color="black"),
+        axis.title=element_text(family="Rockwell",size=14),
+        axis.text=element_text(family="Rockwell",size=8),
         strip.background = element_rect(colour="black"),
         panel.border = element_rect(color="black",fill=NA))
+
+# for black plots
+plot_theme_black <-   theme_minimal()+
+  theme(text=element_text(family="Rockwell",size=12,color="white"),
+        line = element_line(color="gray40"),
+        legend.text = element_text(size=14),
+        axis.title=element_text(family="Rockwell",size=14),
+        axis.text=element_text(family="Rockwell",color="white",size=8),
+        strip.background = element_rect(colour="black"),
+        panel.border = element_rect(color="white",fill=NA),
+        panel.background = element_rect(fill="black"),
+        plot.background = element_rect(fill="black"),
+        panel.grid = element_line(color="gray40"),
+        panel.grid.major = element_line(color="gray40"),
+        panel.grid.minor = element_line(color="gray40"))
 theme_set(plot_theme)
 ```
 
@@ -146,9 +161,9 @@ westend.mean_dens_plot <- westend.meandens %>%
       scale_color_manual(values=c("navyblue","gray50","darkgreen","darkcyan","mediumpurple4","darkred"),
                          guide=guide_legend(title="Species",override.aes = list(size=1)))+
       guides(linetype="none")+
-      theme(text = element_text(size=16),
-            legend.position = c(0.15,0.8),
-            legend.text = element_text(size=12),
+      theme(text = element_text(color="black",size=16),
+            legend.position = c(0.15,0.7),
+            legend.text = element_text(color="black",size=10),
             panel.border = element_blank())
 westend.mean_dens_plot
 rm(pd,period.key,periods.first,westend.long,westend.meandens)
@@ -420,13 +435,17 @@ westend.xmap_all_plot <- ggplot(westend.xmap_rast,aes(x=force.name,y=pred.name,f
   geom_raster() +
   scale_fill_gradient(low = "#9AFF9A", high = "#548B54", space = "Lab", na.value = "grey50", 
       guide = "colourbar",limits=c(0,0.8),breaks=c(0.2,0.4,0.6,0.8),name=expression(paste(rho, "(skill)"))) +
-  ggtitle("Kelp Forest Convergent Cross Mapping, West End") +
+  ggtitle("Kelp Forest Convergent Cross Mapping") +
   xlab("Predictor (Forcing Variable)") +
   ylab("Predicted Variable") +
-  theme(axis.text.x=element_text(angle = 90, hjust = 1,vjust=0.1))
+  theme(text=element_text(color="black"),
+        plot.background = element_rect(fill="white"),
+        axis.text=element_text(color="black"),
+    axis.text.x=element_text(angle = 90, hjust = 1,vjust=0.1),
+    panel.border = element_blank())
 
 westend.xmap_all_plot
-# ggsave("plots/ccm_all.png",plot=westend.xmap_all_plot)
+# ggsave("plots/ccm_all.png",plot=westend.xmap_all_plot,width=7,height=4)
 ```
 
 The plot shows cross-mapped (predictor, or forcing) variables in the columns, while rows are predicted variables (i.e., columns cause rows). Gray indicates a lack of significant causal signal--failure to satisfy one of the above criteria--and darker colors represent higher cross-map skill.
@@ -471,7 +490,6 @@ crds <- cbind(c(116.0000, 318.0000, 177.0000, 581.0000, 346.0000, 385.0000, 331.
 
 # vector of node colors for plotting
 vert.cols <- c(rep("tan3",3),rep("orchid3",2),"tan3",rep("gray70",5))
-
 plot(g,asp=0.8, vertex.label.color="black", vertex.label.cex=0.8, edge.arrow.size=0.6,vertex.label.font=2, vertex.shape="circle", edge.curved=F,margin=0, vertex.size=30,rescale=T,edge.lty=1,edge.color="gray40",layout=crds,vertex.color=vert.cols,vertex.frame.color=NA,main="")
 ```
 
@@ -573,6 +591,9 @@ scatter3D(x[169],y[169],z[169],col="darkgreen",pch=19,cex=2,add=T)
 scatter3D(x[110],y[110],z[110],col="blue",pch=19,cex=2,add=T)
 scatter3D(x[236],y[236],z[236],col="blue",pch=19,cex=2,add=T)
 scatter3D(x[170],y[170],z[170],col="blue",pch=19,cex=2,add=T)
+
+dev.copy(pdf,"plots/multi_attractor.pdf")
+dev.off()
 
 par(op)
 rm(xsmooth,ysmooth,zsmooth,xtemp,ytemp,ztemp,t,tt,seg.start,seg.end,x,y,z,temp)
@@ -964,7 +985,7 @@ Here are some notable effects/trends for each species:
 
 * *Macrocystis pyrifera*
     + Because we have two variables measuring the density of different *Macrocystis* life stages, we can parse out the relative effects of physical conditions on adult vs. juvenile giant kelp.
-    + Environmental stress seems to strengthen the interactions between *Laminaria* and *Pterygophora* and *Macrocystis* recruits. Under conditions of elevated MEI, SST, or PDO, or decreased NPGO, the positive effect of *Pterygophora* and the negative effect of *Laminaria* on *Macrocystis* sporophytes are both enhanced. Similar is true for the adult *Macrocystis*: interactions between the giant kelp and the other algae species are elevated under nutrient- or temperature-stressed conditions. Increased wave height (physical disturbance) seems to enhance the negative effect of *Pterygophora* on *Macrocystis* adults.
+    + Environmental stress seems to strengthen the interactions between *Laminaria* and *Pterygophora* and *Macrocystis* recruits. Under conditions of elevated MEI, SST, or PDO, or decreased NPGO, the positive effect of *Pterygophora* and the negative effect of *Laminaria* on *Macrocystis* sporophytes are both enhanced. Similar is true for the adult *Macrocystis*: interactions between the giant kelp and the other algae species are elevated under nutrient- or temperature-stressed conditions. Increased wave height (physical disturbance) does not seem to have a large effect on the effect of *Laminaria* and *Pterygophora* on *Macrocystis*
     + The effect of purple urchin on both *Macrocystis* adult and juvenile density is stronger than the red urchin effect, and more variable with changing conditions. Purple urchin herbivory as a negative influence on *Macrocystis* is enhanced with elevated disturbance, MEI, and PDO, and slightly reduced with an increase in the NPGO.
     + The strenghts of intraspecies effects (effects of *Macrocystis* adults on juveniles and vice versa) are also influenced by physical conditions, but perhaps in a different way than might be expected. The positive effect of juvenile *Macrocystis* on adult *Macrocystis* seems to be **enhanced** under nutrient-stressed conditions and higher temperatures, and reduced with greater nutrient availability and increased disturbance.
 
@@ -982,9 +1003,29 @@ Here are some notable effects/trends for each species:
 * **Physical disturbance**
     + Higher max wave heights was our proxy for physical stress/disturbance.
     + Higher physical disturbance levels results in reduced interaction strength between the urchin species.
-    + *Pterygophora*'s competitive ability is enhanced with increased disturbance[@Dayton1999], evidenced by an increase in the negative effect of *Pterygophora* on adult *Macrocystis*.
     + *Pterygophora* and *Macrocystis* are both subject to a greater negative effect of herbivory under increased disturbance.
     + *Laminaria* benefits as well. The negative effects of herbivory and algal competition are reduced with increased disturbance, and its intraspecies effect is strengthened.
     + The positive effect of juvenile on adult *Macrocystis* is reduced with increased physical stress.
     
+
+
+### Effect of disturbance on *Macrocystis*
+```{r disturbance and mac,fig.height=7,fig.width=5}
+# with boxplot
+quants <- c(0.05,0.5,0.95)
+waves.mac.pter <- westend %>%
+  select(one_of(c("pter","lam","mac","period"))) %>%
+  distinct() %>%
+  right_join(all.mod.coeffs.long,by="period")%>%
+  gather("external_spp","ext_value",one_of(c('pter','lam','mac')))%>%
+  filter(effect%in% c('waves','pter','lam'),mod=='mac')%>%
+  ggplot(aes(ext_value,value))+
+  geom_point(col='gray60',alpha=0.6)+
+  geom_hline(yintercept = 0,linetype=2)+
+  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+  labs(x="Normalized Density",y="Effect of SWH on Macrocystis")+
+  facet_grid(external_spp~effect,scales="free")
+waves.mac.pter
+
+```
 ## References

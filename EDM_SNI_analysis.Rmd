@@ -32,20 +32,6 @@ plot_theme <-   theme_minimal()+
         strip.background = element_rect(colour="black"),
         panel.border = element_rect(color="black",fill=NA))
 
-# for black plots
-plot_theme_black <-   theme_minimal()+
-  theme(text=element_text(family="Rockwell",size=12,color="white"),
-        line = element_line(color="gray40"),
-        legend.text = element_text(size=14),
-        axis.title=element_text(family="Rockwell",size=14),
-        axis.text=element_text(family="Rockwell",color="white",size=8),
-        strip.background = element_rect(colour="black"),
-        panel.border = element_rect(color="white",fill=NA),
-        panel.background = element_rect(fill="black"),
-        plot.background = element_rect(fill="black"),
-        panel.grid = element_line(color="gray40"),
-        panel.grid.major = element_line(color="gray40"),
-        panel.grid.minor = element_line(color="gray40"))
 theme_set(plot_theme)
 ```
 
@@ -120,6 +106,22 @@ tibble(Variable=colnames(westend),Description=c("Monitoring Transect","Monitorin
 
 
 ```{r mean density over time, echo=F,message=F}
+# black plot theme (for presentations)
+# for black plots
+plot_theme_black <-   theme_minimal()+
+  theme(text=element_text(family="Rockwell",size=12,color="white"),
+        line = element_line(color="gray40"),
+        legend.text = element_text(size=14),
+        axis.title=element_text(family="Rockwell",size=14),
+        axis.text=element_text(family="Rockwell",color="white",size=8),
+        strip.background = element_rect(colour="black"),
+        panel.border = element_rect(color="white",fill=NA),
+        panel.background = element_rect(fill="black"),
+        plot.background = element_rect(fill="black"),
+        panel.grid = element_line(color="gray40"),
+        panel.grid.major = element_line(color="gray40"),
+        panel.grid.minor = element_line(color="gray40"))
+
 # Species naming key for use in plotting
 namekey <- tibble(dataset=c(rep("Benthic density",6),rep("Physical",5)),short=names(westend[3:13]),
                   long=c("Laminaria","Macrocystis >1m","Pterygophora","Purple urchin","Red urchin","Macrocystis <1m","Multivariate ENSO Index","Pacific Decadal Oscillation","North Pacific Gyre Oscillation","Significant Wave Height","Sea Surface Temperature"),plotting=c("L. far","M. pyr","P. cal","S. pur","M. fra","M. pyr (j)","(P) MEI","(P) PDO","(P) NPGO","(P) Max Hs","(P) SST"))
@@ -166,7 +168,39 @@ westend.mean_dens_plot <- westend.meandens %>%
             legend.text = element_text(color="black",size=10),
             panel.border = element_blank())
 westend.mean_dens_plot
-rm(pd,period.key,periods.first,westend.long,westend.meandens)
+rm(pd,westend.long,westend.meandens)
+
+```
+
+```{r physical variables timeseries}
+mei.pdo.npgo.ts.plot <-westend %>%
+  ungroup()%>%
+  slice(1:63)%>%
+  select(period,mei,pdo,npgo)%>%
+  gather("driver","value",mei:npgo,-period)%>%
+  left_join(namekey, by=c("driver"="short"))%>%
+  left_join(periods.first,by="period") %>%
+  ggplot(aes(date_str,value,col=driver))+
+  geom_line(lwd=1.5)+
+  geom_hline(yintercept=0,linetype=2,col="black")+
+  labs(title="Physical Drivers: Climate Modes",x="Year",y="Normalized Index Value")+
+  plot_theme_black
+sst.waves.ts.plot <-westend %>%
+  ungroup()%>%
+  slice(1:63)%>%
+  select(period,sst,waves)%>%
+  gather("driver","value",sst,waves,-period)%>%
+  left_join(namekey, by=c("driver"="short"))%>%
+  left_join(periods.first,by="period") %>%
+  ggplot(aes(date_str,value,col=driver))+
+  geom_line(lwd=1.5)+
+  geom_hline(yintercept=0,linetype=2,col="black")+
+  labs(title="Physical Drivers: Temperature and Disturbance",x="Year",y="Normalized Index Value")+
+  plot_theme_black
+mei.pdo.npgo.ts.plot
+sst.waves.ts.plot
+# ggsave("plots/climate_ts_plot.png",plot=mei.pdo.npgo.ts.plot,width=7,height=4)
+# ggsave("plots/sst_waves_ts_plot.png",plot=sst.waves.ts.plot,width=7,height=4)
 
 ```
 
@@ -368,6 +402,27 @@ It is also generally true that relative cross-mapping skill of a given variable 
 The CCM algorithm uses a random sampling method to test multiple "versions" of each library size, sampling a subset from the supplied library vectors to establish confidence intervals around prediction skill. We again use leave-one-out cross-validation to prevent in-sample fitting.
 
 ***
+
+### Example CCM
+
+Each individual CCM analysis involves looks something like this:
+
+```{r ccm example}
+tempE <- westend.bestE['purp']
+temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 'mac',target_column = 'purp',lib_sizes = c(10,25,50,75,100,125,150,200,300,400,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
+
+mac_xmap_purp <- temp %>%
+  group_by(lib_size)%>%
+  summarise(rhomean=mean(rho,na.rm=T),upper=rhomean+sd(rho,na.rm=T),lower=rhomean-sd(rho,na.rm=T))%>%
+  ungroup()%>%
+  ggplot(aes(lib_size,rhomean))+
+  geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="red")+
+  geom_line(color="darkorchid3")+
+  labs(x="Library Size",y=expression(paste(rho, " (predictive skill)")),title="Macrocystis xmap Purple Urchin")
+
+mac_xmap_purp
+# ggsave("plots/ccm_example.png",plot=mac_xmap_purp,width=6,height=4)
+```
 
 ```{r ccm all species and physical vars, echo=F,warning=F,fig.width=7}
 # Rows hold predicted variables, columns hold forcing variables. There are more columns than rows since the physical variables are included as potential forcing factors.
@@ -958,7 +1013,65 @@ phys_effects_on_interactions[[3]]
 phys_effects_on_interactions[[4]]
 phys_effects_on_interactions[[5]]
 phys_effects_on_interactions[[6]]
+```
 
+```{r some single plots}
+# macrocystis, pterygophora, and temperature
+quants<-c(0.05,0.5,0.95)
+all.coeffs.with.phys %>%
+  filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="sst")%>%
+  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+   geom_point(col='gray60',alpha=0.6)+
+   geom_hline(yintercept = 0,linetype=2,col="white")+
+   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
+   labs(x="Normalized SST",y="Interaction Strength")+
+   facet_grid(~mod,scales = "free_y")+
+  plot_theme_black+
+    theme(strip.text=element_blank(),
+          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
+
+# macrocystis, pterygophora, and NPGO
+all.coeffs.with.phys %>%
+  filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="npgo")%>%
+  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+   geom_point(col='gray60',alpha=0.6)+
+   geom_hline(yintercept = 0,linetype=2,col="white")+
+   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
+   labs(x="Normalized NPGO",y="Interaction Strength")+
+   facet_grid(~mod,scales = "free_y")+
+  plot_theme_black+
+    theme(strip.text=element_blank(),
+          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
+
+# macrocystis, pterygophora, herbivory, and NPGO
+all.coeffs.with.phys %>%
+  filter(type=="herbivory",mod%in% c('mac','pter'),effect %in% c('red','purp'),external_forcing=="npgo")%>%
+  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+   geom_point(col='gray60',alpha=0.6)+
+   geom_hline(yintercept = 0,linetype=2,col="white")+
+   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
+   labs(x="Normalized NPGO",y="Interaction Strength")+
+   facet_grid(~mod,scales = "free_y")+
+  plot_theme_black+
+    theme(strip.text=element_blank(),
+          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
+
+# macrocystis, pterygophora, and waves
+all.coeffs.with.phys %>%
+  filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="waves")%>%
+  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+   geom_point(col='gray60',alpha=0.6)+
+   geom_hline(yintercept = 0,linetype=2,col="white")+
+   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
+   labs(x="Normalized SWH",y="Interaction Strength")+
+   facet_grid(~mod,scales = "free_y")+
+  plot_theme_black+
+    theme(strip.text=element_blank(),
+          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
 
 ```
 
@@ -1011,7 +1124,6 @@ Here are some notable effects/trends for each species:
 
 ### Effect of disturbance on *Macrocystis*
 ```{r disturbance and mac,fig.height=7,fig.width=5}
-# with boxplot
 quants <- c(0.05,0.5,0.95)
 waves.mac.pter <- westend %>%
   select(one_of(c("pter","lam","mac","period"))) %>%
@@ -1026,6 +1138,22 @@ waves.mac.pter <- westend %>%
   labs(x="Normalized Density",y="Effect of SWH on Macrocystis")+
   facet_grid(external_spp~effect,scales="free")
 waves.mac.pter
+```
 
+### Effect of Macrocystis on Laminaria/Pterygophora interaction
+```{r disturbance and mac,fig.height=7,fig.width=5}
+quants <- c(0.05,0.5,0.95)
+mac.lam.pter <- westend %>%
+  select(one_of(c("mac","period"))) %>%
+  distinct() %>%
+  right_join(all.mod.coeffs.long,by="period")%>%
+  gather("external_spp","ext_value",mac)%>%
+  filter(effect=='pter',mod=='lam')%>%
+  ggplot(aes(ext_value,value))+
+  geom_point(col='gray60',alpha=0.6)+
+  geom_hline(yintercept = 0,linetype=2)+
+  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+  labs(x="Normalized Density",y="Effect of Pterygophora on Laminaria")
+mac.lam.pter
 ```
 ## References

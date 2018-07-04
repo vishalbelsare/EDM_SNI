@@ -676,18 +676,47 @@ smap_multi <- function(sitedat,sitesegs,species,causalvars) {
   
   best.mod <- block_lnlp(sitedat,lib=as.matrix(sitesegs),pred=as.matrix(sitesegs),columns=causalvars,target_column = species,theta = opttheta, num_neighbors=0,method="s-map",save_smap_coefficients=T,silent=T)
   
-  # Model output-- time, observations, predictions. time is truncated, so re-expand it to fit with original periods
+  # gather and organize model output
   t <- best.mod$model_output[[1]]$time
   
+  coeff.names <- c(causalvars,"const")
   # Save interaction coefficients
   coeffs <- best.mod$smap_coefficients[[1]]
-  names(coeffs) <- c(causalvars,"const")
+  names(coeffs) <- coeff.names
+  
+  # # Model output-- time, observations, predictions. match time indicator with observations (one period ahead)
   coeffs <- coeffs %>% mutate(time=t)%>%complete(time=full_seq(x=c(1,630),1)) %>% mutate(period=rep(1:63,10))
   
-  # long form for plotting
+  # Save coefficient variances (sensu Deyle 2016; we have a nxn variance-covariance matrix for each estimated point, where n is the total number of causal variables for whom coefficients are estimated, plus the constant term)
+  # Variances for individual coefficients are the diagonals of each covariance matrix
+  coeffs.variances <- best.mod$smap_coefficient_covariances[[1]] %>%
+    purrr::map_dfr(function(x) {
+      # if no estimate, no variance associated with it (NULL)
+      if(is.null(x)) x <- matrix(NaN,nrow=length(coeff.names),ncol=length(coeff.names))
+      # pull out diagonal elements, add variable names
+      out <- t(diag(x)) %>% as.data.frame()
+      names(out) <- coeff.names
+      out
+      })%>%
+    
+    # add period identifier and overall time stamp
+    # mutate(time=t) %>% complete(time=full_seq(c(1,630),1)) %>% mutate(period=rep(1:63,10))
+    mutate(time=t)%>%complete(time=full_seq(x=c(1,630),1)) %>% mutate(period=rep(1:63,10))
+  
+  # long form for plotting, including variance
   coeffs.long <- coeffs %>%
     gather(key=effect,value=value,-period,-time,na.rm=T) %>%
     left_join(namekey, by=c("effect"="short"))
+  
+  # long form variances
+  coeffs.variances.long <- coeffs.variances %>%
+    gather(key=effect,value=variance,-period,-time,na.rm=T) %>%
+    left_join(namekey,by=c("effect"="short"))
+  
+  coeffs.long <- coeffs.long %>%
+    left_join(coeffs.variances.long,by=c("time","period","effect","dataset","long","plotting")) %>%
+    # add standard deviation and +/- 95% CI (1.96*SD)
+    mutate(sd=sqrt(variance),upper=value+1.96*sd,lower=value-1.96*sd)
   
   # box plot of interactions
   sppname <- namekey$long[match(species,namekey$short)]
@@ -700,7 +729,7 @@ smap_multi <- function(sitedat,sitesegs,species,causalvars) {
   
   ## Outputs (to go in a list)
 
-  outlist <- list(model=best.mod,coeffs=coeffs,coeffs.long= coeffs.long,plot=int.box)
+  outlist <- list(model=best.mod,coeffs=coeffs,coeffs.variances=coeffs.variances,coeffs.long= coeffs.long,plot=int.box)
   return(outlist)
 }
 ```
@@ -824,7 +853,7 @@ Few strong and consistent competitive interactions (red and orange boxes for urc
 We can also investigate the effects of the physical forcing variables on the biological dynamics in a similar plot:
 
 
-```{r phys coeffs,echo=F,message=F,warning=F,fig.height=8}
+```{r phys coeffs,echo=F,message=F,warning=F,fig.height=8,fig.width=8}
 # with boxplot
 all.phys.coeffs.plot <- all.mod.coeffs.long %>%
   filter(effect %in% phys.vars)%>%
@@ -980,13 +1009,13 @@ all.coeffs.with.phys<- westend %>%
 With 5%/95% quantile regression. Columns/x-axis indicates the normalized level of a physical stressor, while rows and y-axis denote the type of species interaction (corresponding to the colors in the boxplots above).
 
 ```{r individual_effects,fig.width=7}
-
 phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
   quants <- c(0.05,0.5,0.95)
   plot_title <- namekey$long[match(spp,namekey$short)]
   all.coeffs.with.phys %>%
   filter(!is.na(type),mod==spp)%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
+    geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
     geom_point(col='gray60',alpha=0.6)+
     geom_hline(yintercept = 0,linetype=2)+
     geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
@@ -997,7 +1026,7 @@ phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
           legend.text = element_text(size=12),
           legend.position="right",
           legend.margin=margin(t = -0.5, unit='line'),
-          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"),
+          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line")
         )
 })
 ggsave("plots/phys_effects_red.png",plot=phys_effects_on_interactions[[1]])
@@ -1020,13 +1049,15 @@ phys_effects_on_interactions[[6]]
 quants<-c(0.05,0.5,0.95)
 all.coeffs.with.phys %>%
   filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="sst")%>%
+  
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-   geom_point(col='gray60',alpha=0.6)+
-   geom_hline(yintercept = 0,linetype=2,col="white")+
-   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
-   labs(x="Normalized SST",y="Interaction Strength")+
-   facet_grid(~mod,scales = "free_y")+
+    geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
+    geom_point(col='gray60',alpha=0.6)+
+    geom_hline(yintercept = 0,linetype=2,col="white")+
+    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+    scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
+    labs(x="Normalized SST",y="Interaction Strength")+
+    facet_grid(~mod,scales = "free_y")+
   plot_theme_black+
     theme(strip.text=element_blank(),
           plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
@@ -1035,7 +1066,8 @@ all.coeffs.with.phys %>%
 all.coeffs.with.phys %>%
   filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="npgo")%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-   geom_point(col='gray60',alpha=0.6)+
+  geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+ 
+  geom_point(col='gray60',alpha=0.6)+
    geom_hline(yintercept = 0,linetype=2,col="white")+
    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
    scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
@@ -1049,7 +1081,8 @@ all.coeffs.with.phys %>%
 all.coeffs.with.phys %>%
   filter(type=="herbivory",mod%in% c('mac','pter'),effect %in% c('red','purp'),external_forcing=="npgo")%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-   geom_point(col='gray60',alpha=0.6)+
+   geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
+    geom_point(col='gray60',alpha=0.6)+
    geom_hline(yintercept = 0,linetype=2,col="white")+
    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
    scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
@@ -1063,7 +1096,8 @@ all.coeffs.with.phys %>%
 all.coeffs.with.phys %>%
   filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="waves")%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-   geom_point(col='gray60',alpha=0.6)+
+  geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
+  geom_point(col='gray60',alpha=0.6)+
    geom_hline(yintercept = 0,linetype=2,col="white")+
    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
    scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
@@ -1156,4 +1190,39 @@ mac.lam.pter <- westend %>%
   labs(x="Normalized Density",y="Effect of Pterygophora on Laminaria")
 mac.lam.pter
 ```
+### Effect of urchin density on Macrocystis/Pterygophora interaction
+
+```{r urchin dens mac pter}
+quants <- c(0.05,0.5,0.95)
+urchin.mac.pter <- westend %>%
+  select(one_of(c("red","period"))) %>%
+  distinct() %>%
+  mutate(time=row_number())%>%
+  right_join(all.mod.coeffs.long,by=c("period",'time'))%>%
+  gather("external_spp","ext_value",red)%>%
+  filter(effect %in% c('pter','mac'),mod %in% c('pter','mac'),!is.na(ext_value))%>%
+  ggplot(aes(ext_value,value))+
+  geom_point(col='gray60',alpha=0.6)+
+  geom_hline(yintercept = 0,linetype=2)+
+  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
+  labs(x="Normalized Red Urchin Density",y="Interaction Strength")+
+  facet_wrap(~mod)
+urchin.mac.pter
+```
+
+### Do conditions affect average interaction strength?
+
+```{r conditions and interaction strength}
+# disturbance. top quartile vs. bottom quartile
+all.coeffs.with.phys %>%
+  mutate(av_value=abs(value))%>%
+  filter(external_forcing=='pdo', type=='algal competition', ext_value>=quantile(westend$pdo,0.75,na.rm=T)|ext_value<=quantile(westend$pdo,0.25,na.rm=T))%>%
+  mutate(stress_level=ifelse(ext_value>=quantile(westend$pdo,0.75,na.rm=T),'high','low'))%>%
+  ggplot(aes(av_value,..density..,fill=stress_level))+
+  geom_density(alpha=0.6)+
+  geom_vline(xintercept = 0,linetype=2,color='black')+
+  labs(x='Interaction Strength',y='Probability Density')
+
+```
+
 ## References

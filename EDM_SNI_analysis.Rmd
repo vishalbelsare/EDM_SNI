@@ -450,9 +450,10 @@ for(i in 1:n_row) {
       # remember, we use the best embedding dimension for the target variable (the variable we're cross-mapping to, i.e. the putative forcing variable)
       tempE=westend.bestE[col_names[j]]
       temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 2+j,lib_sizes = c(10,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
-      # mean rho at library size 500
-      rhomean <- temp %>% filter(lib_size==500) %>% ccm_means()
-      westend.xmap_mat[i,j] <- rhomean$rho
+      
+     # mean rho at library size 500
+      rhomeans <- temp %>% ccm_means()
+      westend.xmap_mat[i,j] <- rhomeans$rho[rhomeans$lib_size==500]
       
       # first p-value (greater than zero? at library size 500)
       p1 <- temp %>% filter(lib_size==500) %>% 
@@ -460,8 +461,9 @@ for(i in 1:n_row) {
         summarise(p=(1-sum(pos)/n()))
       westend.p1.mat[i,j] <- as.numeric(p1)
       
-      # second p-value (rho at lib-size 500 greater than rho at lib-size 10?)
+      # second p-value (rho at lib-size 500 greater than rho at lib-size 10? By more than 0.1?)
       p2 <- t.test(temp$rho[temp$lib_size==10],temp$rho[temp$lib_size==500])$p.value
+      if((rhomeans$rho[rhomeans$lib_size==500]-rhomeans$rho[rhomeans$lib_size==10])<0.1) p2 <- 0
       westend.p2.mat[i,j] <- as.numeric(p2)
       
       # overall significance (both p1 and p2 signficant at alpha 0.05)
@@ -1319,5 +1321,126 @@ cc_effects_plot <- function(model,effect1,effect2){
     ggplot(aes_string(effect1,effect2))+geom_point()+geom_smooth(method='lm',se=F)
 }
 ```
+
+## Convergent Cross Mapping interactions with Physical Forcing
+
+Now that we have reconstructed species interactions, we can try using CCM to establish the relationship between the strength of those interactions and physical drivers.
+
+We first create a time series block of the reconstructed attractors, then find their best embedding dimension, followed by cross mapping the interactions to the physical variables
+
+```{r ints block}
+# create time series block of all interactions (later we could come back to this to deal with error)
+interactions.block <- spp.only.mod.coeffs %>%
+  filter(type != "intraspecies", !is.na(type))%>%
+  select(time,period,mod,effect,value)%>%
+  unite("effect_mod",effect,mod)%>%
+  spread(effect_mod,value) %>%
+  complete(time=full_seq(x=c(1,630),1))%>%
+  # join physical variables
+  left_join(select(westend,period,one_of(phys.vars)),by="period")%>%
+  distinct()
+```
+
+```{r simplex ints}
+# Run simplex projection for each species interaction
+interaction_names <- colnames(interactions.block)[3:29]
+interactions.simp.list <- list()
+
+for(i in 2:length(interaction_names)) {
+  x <- interaction_names[i]
+  dat <- interactions.block %>% select(matches(x)) %>% as.data.frame()
+  out <- simplex(as.numeric(dat[,1]),lib=as.matrix(westend.segs),E=2:15,silent=T) %>%
+    mutate(int=x)
+ interactions.simp.list[[x]] <- out
+}
+
+# Save best embedding dimensions
+ints.bestE <- purrr::map_chr(interactions.simp.list,function(x) {
+  temp <- x %>% filter(!is.na(rho))
+  temp$E[temp$rho==max(temp$rho)]
+})
+```
+
+
+```{r ccm}
+## CCM checking physical variables against interactions
+# Rows hold predicted variables, columns hold forcing variables. In this case, the columns (forcing factors) are the physical variables, while the rows are the interactions
+n_col <- length(phys.vars)
+n_row <- dim(interactions.block)[2]-7
+col_names <- phys.vars
+row_names <- interaction_names
+interactions.xmap_mat <- array(NA,dim=c(n_row,n_col),dimnames=list(row_names,col_names))
+
+## CCM causation criterion 1: cross-map skill greater than zero
+# matrix to store a bootstrapped p-value, measuring the probability that a given xmap is greater than zero (calculated as 1 minus the number of positive results for rho divided by the number of iterations)
+interactions.p1.mat <- array(NA,dim=c(n_row,n_col),dimnames=list(row_names,col_names))
+
+## CCM causation criterion 2: evidence for convergence
+# similarly, matrix to store a bootstrapped p-value, this time a t-test value between library size 10 and library size 500, to see if the rho at large library is significantly greater than the rho at small library size (i.e., looking for convergence).
+interactions.p2.mat <- array(NA,dim=c(n_row,n_col),dimnames=list(row_names,col_names))
+
+# if both p1 and p2 are positive, indicate overall significant causal signal
+interactions.ptot.mat <- array(NA,dim=c(n_row,n_col),dimnames=list(row_names,col_names))
+
+## Run CCM for each combination of variables
+for(i in 1:n_row) {
+  for(j in 1:n_col) {
+      # remember, we use the best embedding dimension for the target variable (the variable we're cross-mapping to, i.e. the putative forcing variable, in this case the physical variables)
+      tempE= westend.bestE[col_names[j]]
+      temp <- ccm(interactions.block,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 27+j,
+                  lib_sizes = c(10,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
+      # mean rho at library size 500
+      rhomeans <- temp %>% ccm_means()
+      interactions.xmap_mat[i,j] <- rhomeans$rho[rhomeans$lib_size==500]
+      
+      # first p-value (greater than zero? at library size 500)
+      p1 <- temp %>% filter(lib_size==500) %>% 
+        mutate(pos=ifelse(rho>0,1,0)) %>%
+        summarise(p=(1-sum(pos)/n()))
+      interactions.p1.mat[i,j] <- as.numeric(p1)
+      
+      # second p-value (rho at lib-size 500 greater than rho at lib-size 10? By more than 0.1?)
+      p2 <- t.test(temp$rho[temp$lib_size==10],temp$rho[temp$lib_size==500])$p.value
+      if((rhomeans$rho[rhomeans$lib_size==500]-rhomeans$rho[rhomeans$lib_size==10])<0.1) p2 <- 0
+      interactions.p2.mat[i,j] <- as.numeric(p2)
+      
+      # overall significance (both p1 and p2 signficant at alpha 0.05)
+      interactions.ptot.mat[i,j] <- ifelse(p1<0.05 & p2<0.05,1,0)
+   }
+}
+
+rm(n_col,n_row,col_names,row_names,p1,p2,tempE,temp,rhomean)
+
+# keep only signficant cross-mappings
+interactions.xmap_mat <- interactions.xmap_mat*interactions.ptot.mat %>% as.data.frame()
+interactions.xmap_rast <- interactions.xmap_mat %>% 
+  mutate(predictee=row.names(interactions.xmap_mat)) %>% 
+  gather(key=predictor,value=rho,-predictee)
+
+# If rho is zero, replace with NA (no significant causal signal)
+interactions.xmap_rast$rho[interactions.xmap_rast$rho==0] <- NA
+
+# Names for plotting to distinguish biological and physical variables
+interactions.xmap_rast <- interactions.xmap_rast %>% 
+  mutate(force.name=namekey$plotting[match(predictor,namekey$short)])
+
+## plot
+interactions.xmap_all_plot <- ggplot(interactions.xmap_rast,aes(x=force.name,y=predictee,fill=rho)) +
+  geom_raster() +
+  scale_fill_gradient(low = "#9AFF9A", high = "#548B54", space = "Lab", na.value = "grey50", 
+      guide = "colourbar",limits=c(0,0.8),breaks=c(0.2,0.4,0.6,0.8),name=expression(paste(rho, "(skill)"))) +
+  ggtitle("Interaction Convergent Cross Mapping") +
+  xlab("Predictor (Forcing Variable)") +
+  ylab("Predicted Variable") +
+  theme(text=element_text(color="black"),
+        plot.background = element_rect(fill="white"),
+        axis.text=element_text(color="black"),
+    axis.text.x=element_text(angle = 90, hjust = 1,vjust=0.1),
+    panel.border = element_blank())
+
+interactions.xmap_all_plot
+# ggsave("plots/ccm_ints_phys.png",plot=interactions.xmap_all_plot,width=6,height=5)
+```
+
 
 ## References

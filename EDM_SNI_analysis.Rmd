@@ -742,7 +742,7 @@ smap_multi <- function(sitedat,sitesegs,species,causalvars) {
     mutate(sd=sqrt(variance),upper=value+1.96*sd,lower=value-1.96*sd)
   
   # box plot of interactions
-  sppname <- namekey$long[match(species,namekey$short)]
+  sppname <- species
   int.box <- ggplot(coeffs.long,aes(x=plotting,y=value))+
     geom_boxplot() +
     geom_hline(yintercept=0,linetype=2,col="gray40")+
@@ -1442,5 +1442,24 @@ interactions.xmap_all_plot
 # ggsave("plots/ccm_ints_phys.png",plot=interactions.xmap_all_plot,width=6,height=5)
 ```
 
+### Multivariate S-maps with Interactions
+
+```{r multivariate smaps}
+ints.causal.vars <- purrr::map(interaction_names, function(x) {
+  interactions.xmap_rast %>%
+    filter(predictee==x,!is.na(rho))->out
+  out <- c(x,out$predictor)
+  out
+})
+
+names(ints.causal.vars)=interaction_names
+
+# apply s-maps
+ints.multi.mods <- purrr::map(interaction_names,function(x) {
+  smap_multi(interactions.block,westend.segs,x,ints.causal.vars[[x]])
+})
+names(ints.multi.mods) <- interaction_names
+
+```
 
 ## References

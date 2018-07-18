@@ -22,6 +22,9 @@ require(quantreg)
 require(knitr)
 require(kableExtra)
 require(extrafont)
+require(GGally)
+require(sna)
+require(network)
 
 # plot theme
 plot_theme <-   theme_minimal()+
@@ -408,19 +411,19 @@ The CCM algorithm uses a random sampling method to test multiple "versions" of e
 Each individual CCM analysis involves looks something like this:
 
 ```{r ccm example}
-tempE <- westend.bestE['purp']
-temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 'mac',target_column = 'purp',lib_sizes = c(10,25,50,75,100,125,150,200,300,400,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
+tempE <- westend.bestE['red']
+temp <- ccm(westend,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 'mac',target_column = 'red',lib_sizes = c(10,25,50,75,100,125,150,200,300,400,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
 
-mac_xmap_purp <- temp %>%
+mac_xmap_red <- temp %>%
   group_by(lib_size)%>%
-  summarise(rhomean=mean(rho,na.rm=T),upper=rhomean+sd(rho,na.rm=T),lower=rhomean-sd(rho,na.rm=T))%>%
+  summarise(rhomean=mean(rho,na.rm=T),upper=quantile(rho, 0.975),lower=quantile(rho, 0.025))%>%
   ungroup()%>%
   ggplot(aes(lib_size,rhomean))+
   geom_ribbon(aes(ymin=lower,ymax=upper),alpha=0.3,fill="red")+
   geom_line(color="darkorchid3")+
-  labs(x="Library Size",y=expression(paste(rho, " (predictive skill)")),title="Macrocystis xmap Purple Urchin")
+  labs(x="Library Size",y=expression(paste(rho, " (predictive skill)")),title="Macrocystis xmap Red Urchin")
 
-mac_xmap_purp
+mac_xmap_red
 # ggsave("plots/ccm_example.png",plot=mac_xmap_purp,width=6,height=4)
 ```
 
@@ -463,7 +466,7 @@ for(i in 1:n_row) {
       
       # second p-value (rho at lib-size 500 greater than rho at lib-size 10? By more than 0.1?)
       p2 <- t.test(temp$rho[temp$lib_size==10],temp$rho[temp$lib_size==500])$p.value
-      if((rhomeans$rho[rhomeans$lib_size==500]-rhomeans$rho[rhomeans$lib_size==10])<0.1) p2 <- 0
+      if((rhomeans$rho[rhomeans$lib_size==500]-rhomeans$rho[rhomeans$lib_size==10])<0.1) p2 <- 1
       westend.p2.mat[i,j] <- as.numeric(p2)
       
       # overall significance (both p1 and p2 signficant at alpha 0.05)
@@ -517,37 +520,27 @@ Both sea urchin species are causally linked to *Macrocystis* density, and they a
 
 ### Interaction Network
 
+
 The CCM results translated into an empirical interaction web looks like this:
 
-```{r igraph, echo=F, message=F,warning=F,fig.height=6}
-require(igraph) # R Package for network graphing and analysis
-
-# Add NAs for connections in to physical variables (since we want them just to be exogenous)
+```{r network,fig.height=6,fig.width=6}
 connect.mat <- t(westend.ptot.mat) %>% 
   as.data.frame() %>%
-  mutate(mei=rep(NA,nrow(.)),pdo=rep(NA,nrow(.)),npgo=rep(NA,nrow(.)),waves=rep(NA,nrow(.)),sst=rep(NA,nrow(.))) 
-
-g <- graph.adjacency(as.matrix(connect.mat))
-par(mfrow=c(1,1))
-
-# Variable names
-
-names <- as.character(sapply(V(g)$name, function(x) namekey$plotting[match(x,namekey$short)]))
+  mutate(mei=rep(0,nrow(.)),pdo=rep(0,nrow(.)),npgo=rep(0,nrow(.)),waves=rep(0,nrow(.)),sst=rep(0,nrow(.)))%>%
+  as.matrix()
+names <- map_chr(colnames(connect.mat), function(x) as.character(namekey$plotting[match(x,namekey$short)]))
 names [7:11] <- c("MEI","PDO","NPGO","Max Hs","SST")
+g <- network(connect.mat,vertex.attrnames = names,loops=F)
+g %v% "type" <- c(rep("darkgreen",3),rep("darkorchid1",2),"darkgreen",rep("dodgerblue",5))
+g %v% "labels" <- names
+int_net<-ggnet2(g,arrow.size=8,arrow.gap=0.05,color = "type")+
+  geom_point(aes(color = color), size = 12, alpha = 0.5) +
+  geom_point(aes(color = color), size = 9)+
+  geom_text(aes(label=label),family="Rockwell",size=4)+
+  theme(panel.border = element_rect(colour="white",fill=NA))
 
-# Vertex labels
-V(g)$name <-names
-vert_in <- sapply(degree(g,mode="in"),function(x) paste0("(",x,")"))
-vert_out_in <- paste0(degree(g,mode="out"),vert_in)
-V(g)$label <- paste(sep="\n",V(g)$name, vert_out_in)
-V(g)$label[7:11] <- paste(V(g)$name[7:11])
-
-#vertex coordinates
-crds <- cbind(c(116.0000, 318.0000, 177.0000, 581.0000, 346.0000, 385.0000, 331.1627, 151.8379, 573.0000, 539.0000,  45.0000),c(0.0000, 186.0000, 362.0000, 172.0000,  40.0000, 374.0000, 537.0000, 504.2360, 35.0000, 406.0000, 288.4111))
-
-# vector of node colors for plotting
-vert.cols <- c(rep("tan3",3),rep("orchid3",2),"tan3",rep("gray70",5))
-plot(g,asp=0.8, vertex.label.color="black", vertex.label.cex=0.8, edge.arrow.size=0.6,vertex.label.font=2, vertex.shape="circle", edge.curved=F,margin=0, vertex.size=30,rescale=T,edge.lty=1,edge.color="gray40",layout=crds,vertex.color=vert.cols,vertex.frame.color=NA,main="")
+ggsave("plots/int_net.png",plot=int_net)
+int_net
 ```
 
 In this network, each node represents a variable, and the numbers associated with each are the number of causal connections in the web, outgoing and (incoming). The maximum number of outgoing interactions is 5 (6 total biological variables minus the variable itself), and incoming is 10 (5 biological and 5 physical variables). Algae species are in brown, while the two urchin species are in purple and the physical drivers are in grey. For example, as mentioned above, we can see that young *Macrocystis* (denoted M. pyr (j))is forced by all other variables in the system, but only itself shows a causal forcing on 4 of the 5 other biological variables. Again we can see that while the web is not entirely saturated, there are many unidirectional forcings, and a prevalence of bidirectional causation as well (A forces B *and* B forces A). The adult *Macrocystis* is causally connected to all variables in the analysis.
@@ -743,7 +736,8 @@ smap_multi <- function(sitedat,sitesegs,species,causalvars) {
   
   # box plot of interactions
   sppname <- species
-  int.box <- ggplot(coeffs.long,aes(x=plotting,y=value))+
+  int.box <- coeffs.long %>% filter(effect!='const')%>%
+    ggplot(aes(x=plotting,y=value))+
     geom_boxplot() +
     geom_hline(yintercept=0,linetype=2,col="gray40")+
     xlab("Interacting Variable") +
@@ -1018,10 +1012,10 @@ spp.only.mod.coeffs.plot.box
 ## Mean interactions vs. physical conditions
 # join all original density variables to interaction data
 
-all.coeffs.with.phys<- westend %>%
+spp.only.coeffs.with.phys<- westend %>%
   select(one_of(c(phys.vars,"period"))) %>%
   distinct() %>%
-  right_join(spp.only.mod.coeffs,by="period")%>%
+  right_join(filter(spp.only.mod.coeffs,!is.na(type)),by="period")%>%
   gather("external_forcing","ext_value",one_of(phys.vars))
 
 ```
@@ -1036,10 +1030,10 @@ With 5%/95% quantile regression. Columns/x-axis indicates the normalized level o
 phys_effects_on_interactions <- purrr::map(as.list(study_spp),function(spp) {
   quants <- c(0.05,0.5,0.95)
   plot_title <- namekey$long[match(spp,namekey$short)]
-  all.coeffs.with.phys %>%
+  spp.only.coeffs.with.phys %>%
   filter(!is.na(type),mod==spp)%>%
   ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-    geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
+    # geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
     geom_point(col='gray60',alpha=0.6)+
     geom_hline(yintercept = 0,linetype=2)+
     geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
@@ -1066,64 +1060,6 @@ phys_effects_on_interactions[[3]]
 phys_effects_on_interactions[[4]]
 phys_effects_on_interactions[[5]]
 phys_effects_on_interactions[[6]]
-```
-
-```{r some single plots}
-# macrocystis, pterygophora, and temperature
-quants<-c(0.05,0.5,0.95)
-all.coeffs.with.phys %>%
-  filter(type=="algal competition",mod%in% c('ymac','pter'),effect %in% c('mac','pter'),external_forcing=="sst")%>%
-  
-  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-    geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
-    geom_point(col='black',alpha=0.6)+
-    geom_hline(yintercept = 0,linetype=2,col="black")+
-    geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-    scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
-    labs(x="Normalized SST",y="Interaction Strength")+
-    facet_grid(~mod,scales = "free_y")+
-    theme(plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
-
-# macrocystis, pterygophora, and NPGO
-all.coeffs.with.phys %>%
-  filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="npgo")%>%
-  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-  geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+ 
-  geom_point(col='black',alpha=0.6)+
-   geom_hline(yintercept = 0,linetype=2,col="black")+
-   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
-   labs(x="Normalized NPGO",y="Interaction Strength")+
-   facet_grid(~mod,scales = "free_y")+
-  theme(plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
-
-# macrocystis, pterygophora, herbivory, and NPGO
-all.coeffs.with.phys %>%
-  filter(type=="herbivory",mod%in% c('mac','pter'),effect %in% c('red','purp'),external_forcing=="npgo")%>%
-  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-   geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
-    geom_point(col='black',alpha=0.6)+
-   geom_hline(yintercept = 0,linetype=2,col="black")+
-   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
-   labs(x="Normalized NPGO",y="Interaction Strength")+
-   facet_grid(~mod,scales = "free_y")+
-    theme(plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
-
-# macrocystis, pterygophora, and waves
-all.coeffs.with.phys %>%
-  filter(type=="algal competition",mod%in% c('mac','pter'),effect %in% c('mac','pter'),external_forcing=="waves")%>%
-  ggplot(aes(ext_value,value,col=factor(effect,levels=c("mac","ymac","pter","lam","purp","red"))))+
-  geom_linerange(aes(ymin=lower,ymax=upper),col='gray60')+
-  geom_point(col='black',alpha=0.6)+
-   geom_hline(yintercept = 0,linetype=2,col="black")+
-   geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-   scale_color_manual(values=c('mac'="lightblue",'ymac'="gray30",'pter'="red",'lam'="darkcyan",'purp'="mediumpurple4",'red'="darkred"),guide="none")+
-   labs(x="Normalized SWH",y="Interaction Strength")+
-   facet_grid(~mod,scales = "free_y")+
-    theme(strip.text=element_blank(),
-          plot.margin=unit(c(0.5, 0.5, 0.5, 0.5), units="line"))
-
 ```
 
 Here are some notable effects/trends for each species:
@@ -1171,74 +1107,94 @@ Here are some notable effects/trends for each species:
     + *Laminaria* benefits as well. The negative effects of herbivory and algal competition are reduced with increased disturbance, and its intraspecies effect is strengthened.
     + The positive effect of juvenile on adult *Macrocystis* is reduced with increased physical stress.
     
+### Example: Effect of Macrocystis on Pterygophora
 
+```{r mac pter}
+mac_effect_on_pter <-spp.only.coeffs.with.phys %>%
+  ungroup()%>%
+  filter(mod=="pter",effect=="mac")%>%
+  mutate(phys_high_low=case_when(
+    ext_value > 1 ~ "high",
+    ext_value < -1 ~ "low")) %>%
+  filter(!is.na(phys_high_low))%>%
+  left_join(select(westend,period,one_of(phys.vars)),by="period")%>%
+  group_by(type,external_forcing,phys_high_low)%>%
+  mutate(mean_int=mean(value,na.rm=T))%>%
+  distinct()%>%
+  ungroup()
 
-### Effect of disturbance on *Macrocystis*
-```{r disturbance and mac,fig.height=7,fig.width=5}
-quants <- c(0.05,0.5,0.95)
-waves.mac.pter <- westend %>%
-  select(one_of(c("pter","lam","mac","period"))) %>%
-  distinct() %>%
-  right_join(all.mod.coeffs.long,by="period")%>%
-  gather("external_spp","ext_value",one_of(c('pter','lam','mac')))%>%
-  filter(effect%in% c('waves','pter','lam'),mod=='mac')%>%
-  ggplot(aes(ext_value,value))+
-  geom_point(col='gray60',alpha=0.6)+
-  geom_hline(yintercept = 0,linetype=2)+
-  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-  labs(x="Normalized Density",y="Effect of SWH on Macrocystis")+
-  facet_grid(external_spp~effect,scales="free")
-waves.mac.pter
+mac_effect_on_pter %>%
+ggplot(aes(value,..density..,fill=phys_high_low))+
+  geom_density(col=NA,alpha=0.6)+
+  geom_vline(xintercept=0,linetype=2)+
+  geom_vline(aes(xintercept=mean_int,color=phys_high_low))+
+  scale_fill_manual(values=c("red","blue"),name="Physical\nForcing Value")+
+  scale_color_manual(values=c("red","blue"))+
+  guides(color="none")+
+  labs(x="Effect of Macrocystis on Pterygophora",y="Probability Density")+
+  facet_grid(rows=vars(external_forcing))
+
 ```
 
-### Effect of Macrocystis on Laminaria/Pterygophora interaction
-```{r disturbance and mac,fig.height=7,fig.width=5}
-quants <- c(0.05,0.5,0.95)
-mac.lam.pter <- westend %>%
-  select(one_of(c("mac","period"))) %>%
-  distinct() %>%
-  right_join(all.mod.coeffs.long,by="period")%>%
-  gather("external_spp","ext_value",mac)%>%
-  filter(effect=='pter',mod=='lam')%>%
-  ggplot(aes(ext_value,value))+
-  geom_point(col='gray60',alpha=0.6)+
-  geom_hline(yintercept = 0,linetype=2)+
-  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-  labs(x="Normalized Density",y="Effect of Pterygophora on Laminaria")
-mac.lam.pter
-```
-### Effect of urchin density on Macrocystis/Pterygophora interaction
+### Distribution of interaction strengths by type
 
-```{r urchin dens mac pter}
-quants <- c(0.05,0.5,0.95)
-urchin.mac.pter <- westend %>%
-  select(one_of(c("red","period"))) %>%
-  distinct() %>%
-  mutate(time=row_number())%>%
-  right_join(all.mod.coeffs.long,by=c("period",'time'))%>%
-  gather("external_spp","ext_value",red)%>%
-  filter(effect %in% c('pter','mac'),mod %in% c('pter','mac'),!is.na(ext_value))%>%
-  ggplot(aes(ext_value,value))+
-  geom_point(col='gray60',alpha=0.6)+
-  geom_hline(yintercept = 0,linetype=2)+
-  geom_quantile(quantiles=quants,lineend = "round",size=1,formula=y~x)+
-  labs(x="Normalized Red Urchin Density",y="Interaction Strength")+
-  facet_wrap(~mod)
-urchin.mac.pter
+```{r interactions density plot by type,fig.height=6}
+# Density plot
+interaction_distribution_by_type <- spp.only.mod.coeffs %>%
+  filter(!is.na(type))%>%
+  group_by(type) %>%
+  mutate(mean_int=mean(value,na.rm=T))%>%
+  ungroup()%>%
+  ggplot(aes(value,..density..))+
+  geom_density(aes(fill=type),alpha=0.8,col=NA)+
+  geom_vline(xintercept=0,linetype=2)+
+  geom_vline(aes(xintercept=mean_int))+
+  scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+   guides(fill=F)+
+  xlim(-2,2)+
+  labs(x="Interaction strength",y="Kernel density")+
+  geom_text(aes(x=-2,y=0.5,label=type),hjust="inward",family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
+  facet_grid(rows=vars(type))+
+  theme(strip.text = element_blank())
+
+interaction_distribution_by_type
+ggsave("plots/int_dist_by_type_density.png",plot=interaction_distribution_by_type,h=6)
 ```
 
-### Do conditions affect average interaction strength?
+```{r ints dist by type and phys}
+int_dist_by_type_phys <- spp.only.coeffs.with.phys %>%
+  ungroup()%>%
+  mutate(phys_high_low=case_when(
+    ext_value > 1 ~ "high",
+    ext_value < -1 ~ "low")) %>%
+  left_join(select(westend,period,one_of(phys.vars)),by="period")%>%
+  group_by(type,external_forcing,phys_high_low)%>%
+  mutate(mean_int=mean(value,na.rm=T))%>%
+  distinct()%>%
+  ungroup()
 
-```{r conditions and interaction strength}
-# disturbance. top quartile vs. bottom quartile
-all.coeffs.with.phys %>%
-  mutate(av_value=abs(value))%>%
-  filter(external_forcing=='waves', type=='algal competition', ext_value>=quantile(westend$pdo,0.75,na.rm=T)|ext_value<=quantile(westend$pdo,0.25,na.rm=T))%>%
-  mutate(stress_level=ifelse(ext_value>=quantile(westend$pdo,0.75,na.rm=T),'high','low'))%>%
-  ggplot(aes(log(value),..density..,fill=stress_level))+
-  geom_density(alpha=0.6)+
-  geom_vline(xintercept = 0,linetype=2,color='black')+
-  labs(x='Interaction Strength',y='Probability Density')
+int_dist_by_type_phys_plots <- purrr::map(phys.vars,function(x) {
+  int_dist_by_type_phys %>%
+    filter(external_forcing==x,!is.na(phys_high_low))%>%
+    ggplot(aes(value,..density..,fill=phys_high_low,col=phys_high_low))+
+    geom_density(alpha=0.6,col=NA)+
+    geom_vline(xintercept=0,linetype=2)+
+    geom_vline(aes(xintercept=mean_int,col=phys_high_low))+
+    xlim(-2,2)+
+    scale_fill_manual(values=c("red","blue"),name=paste0(x,"\nLevel"),labels=c("high (> 1)","low (< 1)"))+
+    scale_color_manual(values=c('red','blue'))+
+    guides(color="none")+
+    geom_text(aes(x=-2,y=0.5,label=type),col="black",hjust="inward",family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
+    labs(x="Interaction strength",y="Kernel density")+
+    facet_grid(rows=vars(type))+
+    theme(strip.text=element_blank())
+  })
+names(int_dist_by_type_phys_plots) <- phys.vars
+int_dist_by_type_phys_plots$mei
+int_dist_by_type_phys_plots$sst
+int_dist_by_type_phys_plots$pdo
+int_dist_by_type_phys_plots$waves
+int_dist_by_type_phys_plots$npgo
 
 ```
 
@@ -1338,12 +1294,26 @@ interactions.block <- spp.only.mod.coeffs %>%
   complete(time=full_seq(x=c(1,630),1))%>%
   # join physical variables
   left_join(select(westend,period,one_of(phys.vars)),by="period")%>%
-  distinct()
+  distinct()%>%
+  ungroup()%>%
+  # normalize
+  mutate_at(vars(lam_mac:ymac_red),function(dens) {(dens-mean(dens,na.rm=T))/sd(dens,na.rm=T)})
 ```
+
+```{r ints time series plot}
+spp.only.mod.coeffs %>%
+  filter(time %in% 1:63,type=="algal competition")%>%
+  unite("interaction",effect,mod,sep="_")%>%
+  ggplot(aes(time,value,color=interaction))+
+  geom_line()+
+  geom_point()+
+  labs(x="period",y="interaction strength")
+```
+
 
 ```{r simplex ints}
 # Run simplex projection for each species interaction
-interaction_names <- colnames(interactions.block)[3:29]
+interaction_names <- colnames(interactions.block)[3:22]
 interactions.simp.list <- list()
 
 for(i in 2:length(interaction_names)) {
@@ -1358,6 +1328,9 @@ for(i in 2:length(interaction_names)) {
 ints.bestE <- purrr::map_chr(interactions.simp.list,function(x) {
   temp <- x %>% filter(!is.na(rho))
   temp$E[temp$rho==max(temp$rho)]
+})
+purrr::map_chr(interactions.simp.list,function(x) {
+  max(x$rho,na.rm=T)
 })
 ```
 
@@ -1387,7 +1360,7 @@ for(i in 1:n_row) {
   for(j in 1:n_col) {
       # remember, we use the best embedding dimension for the target variable (the variable we're cross-mapping to, i.e. the putative forcing variable, in this case the physical variables)
       tempE= westend.bestE[col_names[j]]
-      temp <- ccm(interactions.block,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 27+j,
+      temp <- ccm(interactions.block,lib=as.matrix(westend.segs),pred=as.matrix(westend.segs),E=tempE,lib_column= 2+i,target_column = 2+length(interaction_names)+j,
                   lib_sizes = c(10,500),num_samples=100,replace=T,silent=T,RNGseed = 41389)
       # mean rho at library size 500
       rhomeans <- temp %>% ccm_means()
@@ -1428,7 +1401,7 @@ interactions.xmap_rast <- interactions.xmap_rast %>%
 interactions.xmap_all_plot <- ggplot(interactions.xmap_rast,aes(x=force.name,y=predictee,fill=rho)) +
   geom_raster() +
   scale_fill_gradient(low = "#9AFF9A", high = "#548B54", space = "Lab", na.value = "grey50", 
-      guide = "colourbar",limits=c(0,0.8),breaks=c(0.2,0.4,0.6,0.8),name=expression(paste(rho, "(skill)"))) +
+      guide = "colourbar",limits=c(0,0.75),breaks=c(0.25,0.5,0.75),name=expression(paste(rho, "(skill)"))) +
   ggtitle("Interaction Convergent Cross Mapping") +
   xlab("Predictor (Forcing Variable)") +
   ylab("Predicted Variable") +
@@ -1448,7 +1421,7 @@ interactions.xmap_all_plot
 ints.causal.vars <- purrr::map(interaction_names, function(x) {
   interactions.xmap_rast %>%
     filter(predictee==x,!is.na(rho))->out
-  out <- c(x,out$predictor)
+  out <- out$predictor
   out
 })
 
@@ -1456,9 +1429,14 @@ names(ints.causal.vars)=interaction_names
 
 # apply s-maps
 ints.multi.mods <- purrr::map(interaction_names,function(x) {
-  smap_multi(interactions.block,westend.segs,x,ints.causal.vars[[x]])
+  if(length(ints.causal.vars[[x]])==0) return(NULL)
+  else(smap_multi(interactions.block,westend.segs,x,ints.causal.vars[[x]]))
 })
 names(ints.multi.mods) <- interaction_names
+
+purrr::map_dbl(ints.multi.mods, function(x) {
+x$model$rho
+})
 
 ```
 

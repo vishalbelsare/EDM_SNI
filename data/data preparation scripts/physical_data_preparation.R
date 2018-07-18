@@ -25,7 +25,7 @@ library(lubridate)
 
 #### Period matching key ####
 # Have to line up the periods such that December is included in the next Spring's period
-period.key <- data_frame(year=rep(1980:2014,each=12),month=rep(1:12,35),period=c(rep(NA,5),rep(1,6),rep(2:69,each=6),NA))
+period.key <- data_frame(year=rep(1980:2011,each=12),month=rep(1:12,32),period=c(rep(NA,5),rep(1,6),rep(2:63,each=6),NA))
 
 # Set months that are not in Dec-Mar or Jun-Sep as NA so their data aren't included
 period.key$period[!period.key$month %in% c(12,1,2,3,6,7,8,9)] <- NA
@@ -144,14 +144,14 @@ source("data/data preparation scripts/wave_height_Bell.R")
 
 # Join the two datasets together, using the normalized buoy data to "fill in" the modeled data
 wavesboth <- wavesdf %>%
-  mutate(waves.norm=(maxHs-mean(maxHs,na.rm=T))/sd(maxHs,na.rm=T))%>%
   # Use the periods key to assign periods to each month, and remove irrelevant data
   left_join(period.key,by=c("year"="year","month"="month")) %>%
   filter(!is.na(period)) %>%
   
-  # For each period, average the SST value to make just one value for each period
+  # For each period, average the SWH value to make just one value for each period
   group_by(period) %>%
-  summarise(waves.norm=max(waves.norm,na.rm=T)) %>%
+  summarise(waves=max(maxHs,na.rm=T)) %>%
+  mutate(waves.norm=(waves-mean(waves,na.rm = T))/sd(waves,na.rm=T))%>%
   ungroup()
 
 #### Sea Surface Temperature ####

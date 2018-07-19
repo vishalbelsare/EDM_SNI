@@ -1,0 +1,109 @@
+---
+title: "Environmental Context Dependency in Species Interactions"
+author: "Owen Liu"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+fontsize: 12pt
+bibliography: citation_bibtex.bib
+csl: nature.csl
+editor_options: 
+ chunk_output_type: inline
+header-includes:
+  - \usepackage[left]{lineno}
+  - \linenumbers
+  - \renewcommand\linenumberfont{\normalfont\bfseries\small}
+---
+
+```{r global_options, include=F,message=F}
+require(knitr)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE,results = 'asis',dpi=96)
+```
+
+**Primary target journal**: Nature Ecology and Evolution
+
+**Journal Guidelines**:
+
+* Maximum 3500 words main text (excluding introductory paragraph/abstract)
+* Maximum 6 display items (figures/tables)
+* The introductory paragraph is typically 150 words and is unreferenced; it contains a brief account of the background and rationale of the work, followed by a statement of the main conclusions introduced by the phrase "Here we show" or some equivalent.An introduction (without heading) of up to 500 words of referenced text expands on the background of the work (some overlap with the summary is acceptable), and is followed by a concise, focused account of the findings (headed 'Results'), and one or two short paragraphs of discussion (headed 'Discussion').
+
+**Work confirmed/supported/debates**:
+
+* Tegner et al 1997, Dayton et al 1999
+* Bottom-up vs. top-down forcing? Disturbance or herbivory?
+* Competition between urchin species?
+* Physical drivers increase predictability of algae models!
+
+**Suggested future research**
+
+* Predominance of mutualism- why the positive interactions of Pterygophora and Macrocystis?
+* Urchin grazing pressure as most important??
+* Multiple stressors (e.g. herbivory, sst, wave height)
+
+**FIGURES**
+
+Time series of study species
+Example attractor?
+CCM results
+Empirical interaction web, in “normal”, “high disturbance”, and “high nutrient stress” environments??
+
+***
+
+## Introductory paragraph (abstract)
+
+Ecological interactions are not uniform across time, and instead vary with environmental conditions. Interactions among species are often measured with short-term controlled experiments, but these experiments are subject to the particular environmental conditions under which they are performed. As an alternative, we utilize empirical dynamic modeling applied to a 30-year time series to estimate species interaction strengths across a wide range of environmental conditions in a coastal marine ecosystem. By including large-scale climate indices, sea surface temperature, and a measure of physical disturbance in analyses, we show that environmental context influences the strength and direction of species interactions. In so doing, we are able to confirm and extend results from previous studies, as well as identify potentially important but understudied interactions. The significant context dependency in species interactions found in this study argues for a greater utilization of long-term data and empirical dynamic modeling in studies of ecosystem dynamics.
+
+## Introduction
+
+Interactions between species drive patterns of diversity, stability, resilience, and productivity in nature [@Connell1978; @Suttle2007a; @Tilman1999d; @Berlow1999b]. In any ecosystem, the collection of species interactions determines community dynamics. Until recently, most studies viewed these dynamics---e.g., the bleaching and recovery of a coral reef, or the assembly and disassembly of terrestrial plant communities---as processes resulting from static, predictable species interactions. However, the observation that species interactions are not spatiotemporally uniform [@Odadi2011; @Pennings2005; @Menge1994; @Chamberlain2014] calls into question assumptions of interaction stability.
+
+Ecologists recognize now that important species interactions may vary over time, but this context dependency remains difficult to measure and describe. Experiments that measure interactions are generally performed over a limited spatiotemporal range, and are therefore subject to a specific environmental context that may not encompass the range of conditions experienced by that ecosystem over longer time scales [@Vaughn2010]. This is worrying, since environmental context can profoundly influence the outcome of species interactions ranging anywhere from keystone predation [@Menge1994] to competition [@Lima2008; @Holzapfel1999a; @Odadi2011], to protective symbioses [@Daskin2012; @Glynn1996; @White2017a].
+
+Moreover, the focus of the search for context dependency has been on mean interaction strengths, at the expense of specific examinations of interaction variance [@Chamberlain2014]. This focus may be misguided, as it has been shown that interactions that are variable in magnitude and direction—and therefore “weak” when averaged—may actually be some of the most important in driving community dynamics [@Berlow1999b]. If key species interactions are variable in this way across environmental gradients, then many studies may be attributing important ecological phenomena to observational noise.
+
+A solution to these difficulties is to a) utilize ecological observations collected over a long time period, across a large range of environmental contexts, with b) an analytical method to directly estimate context-dependent species interactions from those observations. Such an approach could help to characterize environmental contingencies in species interactions and explicitly examine interaction variability. Here, we use empirical dynamic modelling (EDM, [@Deyle2016]) to estimate a varying species interaction network and establish environmental context dependency in interaction strength and direction. Empirical dynamic modelling uses information from single or multiple time series to empirically model relationships between variables through the reconstruction of dynamic attractors (https://youtu.be/8DikuwwPWsY). The general modelling framework for all EDM methods is readily adaptable to many different sorts of time series variables, including environmental variables manifesting at different scales [@Deyle2013; @Chang2017; @Ye2015]. Because the methods are specifically designed for nonlinear dynamic systems, EDM---in theory---should be able to illuminate context-dependent patterns in species interactions.
+
+Recently-developed EDM methods exist for uncovering dynamic species interactions from time series data [@Deyle2016], but these methods have insofar been applied only to simulated and planktonic communities, and their utility to the study of other ecological systems remains untested. We focus here instead on giant kelp forests in southern California, a diverse and temporally dynamic ecosystem in which many important species interactions are well-documented [@Foster1985a; @Graham2007c; @Teagle2017]. The study of kelp forests has been foundational to ecological theory, especially regarding the relative influence of top-down and bottom-up structuring forces [@Estes1974a; @Graham1997; @Kvitek1998a; @Foster2010; @Reed2011]. Recently, however, findings from long-term kelp forest research programs have begun to challenge many long-held beliefs about the drivers of kelp forest ecosystem dynamics [@Reed2016]. In particular, a longer-term perspective has led to a recognition of the critical importance of environmental context—such as level of physical disturbance or the current state of El Niño conditions—for understanding kelp forest processes [@Parnell2010; @Byrnes2011; @Bell2015; @Young2015].
+
+In this study, we utilize monitoring data from one such effort at San Nicolas Island, a small, remote member of the California Channel Islands in the northeast Pacific [@Kenner2013]. Our analyses focus on the dynamics of five common southern California kelp forest species, whose interactions are thought to be important in structuring kelp forest ecosystems [@Foster1985a; @Foster1990a; @Teagle2017]. The giant kelp *Macrocystis pyrifera* is the eponymous foundation species, the primary canopy- and habitat-forming kelp along most of the central and southern coast of California [@Graham2007c]. We explore its dynamics and interactions with two presumptive competitors and two abundant herbivores. The understory kelp species *Laminaria farlowii* and *Pterygophora californica* compete with Macrocystis for space, light, and nutrients [@Dayton1984; @Dayton1999; @Reed1984]. The two herbivores---the purple sea urchin *Strongylocentrotus purpuratus* and the red sea urchin *Mesocentrotus franciscanus*---are thought in many places to control Macrocystis density and can sometimes wipe out entire giant kelp forests, leading to the alternative ecosystem state known as an urchin barren [@Ling2014].
+
+To characterize environmental context dependency in kelp forest interactions between these five species, we take three general steps (see Methods). First, we use empirical dynamic modeling causality tests called convergent cross-mapping [@Sugihara2012] to construct a kelp forest species interaction network directly from time series data. Even though these common kelp forest species are all thought to interact, we tested that assumption with convergent cross mapping, which can separate correlation from causation [@Sugihara2012].
+
+Second, we use multivariate S-maps (sequential locally weighted global linear maps) [@Deyle2016; @Sugihara1994] to reconstruct the interactions between species for all of the causal links established in the previous step. S-maps reconstructs dynamic “attractors” by casting the abundances of causally-related species into state space. That is, for a set of causally-related species $A$, $B$, and $C$, a point in multivariate space $\{A_t, B_t, C_t\}$ can be plotted, using each species’ abundance at time t. The attractor is then created by tracing this multivariate trajectory forward in time for all t (FIG?). S-maps then computes sequential Jacobian matrices for each point along the attractor, where the elements of each matrix are the partial derivatives between species. These estimated partial derivatives are our measure of species interactions.
+
+The last step is to investigate if and how species interactions varies with environmental context. Because multivariate S-maps are computed for every point along reconstructed attractors, we can extract distributions of interactions that can be related back to environmental context. We explore patterns of species interactions in relation to sea surface temperature, physical disturbance (measured by wave height), and three indices of low-frequency climate modes: the Multivariate ENSO Index, the Pacific Decadal Oscillation, and the North Pacific Gyre Oscillation [@Wolter2011; @Mantua2002; @DiLorenzo2008].
+
+## Results and discussion
+
+```{r fig.width=4, fig.height=4,echo=FALSE,fig.cap="Example reconstructed dynamic attractor"}
+library(png)
+library(grid)
+include_graphics("plots/multi_attractor.pdf")
+```
+
+```{r fig.width=4, fig.height=4,echo=FALSE,fig.cap="Reconstructed interaction web using results of convergent cross mapping"}
+include_graphics("plots/ccm_network.pdf")
+```
+
+```{r echo=FALSE,fig.cap="Distribution of estimated interaction by type"}
+img <- readPNG("plots/int_dist_by_type_density.png")
+grid.raster(img)
+```
+
+```{r echo=FALSE, fig.cap="Mean and standard deviation of each estimated unidirectional species interaction"}
+img <- readPNG("plots/int_mean_sd.png")
+grid.raster(img)
+```
+
+```{r echo=FALSE,fig.cap="Macrocystis effect on Pterygophora"}
+img <- readPNG("plots/mac_effect_on_pter_phys.png")
+grid.raster(img)
+```
+
+
+* CCM results and variable interaction network- centrality of Macrocystis
+* Mean vs. variance in certain algal interactions?
+* Bidirectional mean interactions (across two dimensions, A on B and B on A)?
+* Frequency of positive vs. negative interactions? Across environmental gradients?
+
+## References

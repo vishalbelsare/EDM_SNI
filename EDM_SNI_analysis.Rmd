@@ -26,6 +26,8 @@ require(GGally)
 require(ggalt)
 require(sna)
 require(network)
+require(gridExtra)
+require(RANN)
 
 # plot theme
 plot_theme <-   theme_minimal()+
@@ -128,12 +130,12 @@ plot_theme_black <-   theme_minimal()+
 
 # Species naming key for use in plotting
 namekey <- tibble(dataset=c(rep("Benthic density",6),rep("Physical",5)),short=names(westend[3:13]),
-                  long=c("Laminaria","Macrocystis >1m","Pterygophora","Purple urchin","Red urchin","Macrocystis <1m","Multivariate ENSO Index","Pacific Decadal Oscillation","North Pacific Gyre Oscillation","Significant Wave Height","Sea Surface Temperature"),plotting=c("L. far","M. pyr","P. cal","S. pur","M. fra","M. pyr (j)","(P) MEI","(P) PDO","(P) NPGO","(P) Max Hs","(P) SST"))
+                  long=c("Laminaria","Macrocystis >1m","Pterygophora","Purple urchin","Red urchin","Macrocystis <1m","Multivariate ENSO Index","Pacific Decadal Oscillation","North Pacific Gyre Oscillation","Significant Wave Height","Sea Surface Temperature"),plotting=c("L. far","M. pyr","P. cal","S. pur","M. fra","M. pyr (j)","(P) MEI","(P) PDO","(P) NPGO","(P) SWH","(P) SST"))
 
 namekey <- bind_rows(namekey, data_frame(long="NA",dataset="NA",short="const",plotting="Constant")) %>%
   
   # define column "plotting" as a factor so we can later control plotting order on figures
-  mutate(plotting=factor(plotting,levels=c("(P) MEI","(P) PDO","(P) NPGO","(P) Max Hs","(P) SST","M. pyr","M. pyr (j)","L. far","P. cal","S. pur","M. fra","Constant")),
+  mutate(plotting=factor(plotting,levels=c("(P) MEI","(P) PDO","(P) NPGO","(P) SWH","(P) SST","M. pyr","M. pyr (j)","L. far","P. cal","S. pur","M. fra","Constant")),
          long=factor(long,levels=c("Macrocystis >1m","Macrocystis <1m","Pterygophora","Laminaria","Purple urchin","Red urchin","Multivariate ENSO Index","Pacific Decadal Oscillation","North Pacific Gyre Oscillation","Significant Wave Height","Sea Surface Temperature","Constant")))
 
 # key relating monitoring period to its year/month
@@ -168,15 +170,16 @@ westend.mean_dens_plot <- westend.meandens %>%
                          guide=guide_legend(title="Species",override.aes = list(size=1)))+
       guides(linetype="none")+
       theme(text = element_text(color="black",size=16),
+            axis.title=element_text(size=10),
             legend.position = c(0.15,0.7),
             legend.text = element_text(color="black",size=10),
             panel.border = element_blank())
 westend.mean_dens_plot
 rm(pd,westend.long,westend.meandens)
-
+# ggsave("plots/normalized_time_series.pdf",h=5,w=7)
 ```
 
-```{r physical variables timeseries}
+```{r physical variables timeseries,fig.height=9,fig.width=7}
 mei.pdo.npgo.ts.plot <-westend %>%
   ungroup()%>%
   slice(1:63)%>%
@@ -188,7 +191,7 @@ mei.pdo.npgo.ts.plot <-westend %>%
   geom_line(lwd=1.5)+
   geom_hline(yintercept=0,linetype=2,col="black")+
   labs(title="Physical Drivers: Climate Modes",x="Year",y="Normalized Index Value")+
-  plot_theme_black
+  theme(axis.title=element_text(size=10))
 sst.waves.ts.plot <-westend %>%
   ungroup()%>%
   slice(1:63)%>%
@@ -200,12 +203,16 @@ sst.waves.ts.plot <-westend %>%
   geom_line(lwd=1.5)+
   geom_hline(yintercept=0,linetype=2,col="black")+
   labs(title="Physical Drivers: Temperature and Disturbance",x="Year",y="Normalized Index Value")+
-  plot_theme_black
+  theme(axis.title=element_text(size=10))
 mei.pdo.npgo.ts.plot
 sst.waves.ts.plot
 # ggsave("plots/climate_ts_plot.png",plot=mei.pdo.npgo.ts.plot,width=7,height=4)
 # ggsave("plots/sst_waves_ts_plot.png",plot=sst.waves.ts.plot,width=7,height=4)
-
+lay <- rbind(1,2,3,3)
+norm_ts<-grid.arrange(mei.pdo.npgo.ts.plot,sst.waves.ts.plot,westend.mean_dens_plot,layout_matrix=lay)
+norm_ts
+# ggsave("plots/normalized_time_series.pdf",plot=norm_ts,h=9,w=7)
+rm(lay)
 ```
 
 ***
@@ -221,6 +228,7 @@ First, we use simplex projection to get a sense of system dimensionality for eac
 
 ***
 ```{r time series segments, include=F}
+
 # segments of the time series (which rows of the data are individual transects?)
 westend_segs_sites <- westend %>%
   ungroup() %>%
@@ -475,7 +483,7 @@ for(i in 1:n_row) {
     }
   }
 }
-rm(n_col,n_row,col_names,row_names,p1,p2,tempE,temp,rhomean)
+rm(n_col,n_row,col_names,row_names,p1,p2,tempE,temp,rhomeans)
 
 # keep only signficant cross-mappings
 westend.xmap_mat <- westend.xmap_mat*westend.ptot.mat %>% as.data.frame()
@@ -496,6 +504,7 @@ westend.xmap_all_plot <- ggplot(westend.xmap_rast,aes(x=force.name,y=pred.name,f
   geom_raster() +
   scale_fill_gradient(low = "#9AFF9A", high = "#548B54", space = "Lab", na.value = "grey50", 
       guide = "colourbar",limits=c(0,0.8),breaks=c(0.2,0.4,0.6,0.8),name=expression(paste(rho, "(skill)"))) +
+  geom_text(aes(label=round(rho,2)),family="Rockwell")+
   ggtitle("Kelp Forest Convergent Cross Mapping") +
   xlab("Predictor (Forcing Variable)") +
   ylab("Predicted Variable") +
@@ -558,7 +567,7 @@ edge.weight.mat
 
 names <- map_chr(colnames(connect.mat), function(x) as.character(namekey$plotting[match(x,namekey$short)]))
 names[6] <- "M. pyr\n(j)"
-names [7:11] <- c("MEI","PDO","NPGO","Max Hs","SST")
+names [7:11] <- c("MEI","PDO","NPGO","SWH","SST")
 
 # initiate the igraph
 g2 <- graph.adjacency(connect.mat)
@@ -597,7 +606,7 @@ curves[20] <- -0.1
 curves[c(6,39)] <- 0.2
 
 #plot to file if uncommented
-# png("plots/ccm_network.png",height=600,width=600)
+# pdf("plots/ccm_network.pdf",height=7,width=7)
 plot(g2,asp=0.8, vertex.label.color="black",vertex.label.family="Times", vertex.label.cex=0.6, edge.arrow.size=0.8,edge.arrow.width=0.8,vertex.label.font=2, vertex.shape="circle", edge.curved=curves,margin=0,vertex.size=20,rescale=T,edge.lty=1,edge.color=edge.cols,layout=layout_in_circle,vertex.color=vert.cols,vertex.frame.color="black",main="")
 # dev.off()
 ```
@@ -707,7 +716,6 @@ for(i in 2:5) {
 scatter3D(x[46],y[46],z[46],col="red",pch=19,cex=2,add=T)
 
 #manually find nearest neighbors to point 46
-require(RANN)
 temp <- westend %>% select(lam,mac,purp) %>% slice(1:315) %>% mutate(id=row_number()) %>%
   filter(!is.na(lam))
 tempnn <-nn2(temp[,1:3],k=4)$nn.idx %>% as.data.frame()
@@ -1202,6 +1210,7 @@ ggplot(aes(value,..density..,fill=phys_high_low))+
   theme(strip.text=element_text(size=10))
 
 # ggsave("plots/mac_effect_on_pter_phys.png",plot=mac_effect_on_pter_plot,h=6,w=6,dpi=500)
+# ggsave("plots/mac_effect_on_pter_phys.pdf",plot=mac_effect_on_pter_plot,h=6,w=6)
 mac_effect_on_pter_plot
 ```
 
@@ -1210,7 +1219,7 @@ mac_effect_on_pter_plot
 ```{r interactions density plot by type,fig.height=6,fig.width=6}
 # Density plot
 interaction_distribution_by_type <- spp.only.mod.coeffs %>%
-  filter(!is.na(type))%>%
+  filter(!is.na(type),type != "intraspecies")%>%
   group_by(type) %>%
   mutate(mean_int=mean(value,na.rm=T))%>%
   ungroup()%>%
@@ -1228,6 +1237,7 @@ interaction_distribution_by_type <- spp.only.mod.coeffs %>%
 
 interaction_distribution_by_type
 # ggsave("plots/int_dist_by_type_density.png",plot=interaction_distribution_by_type,h=6,w=6,dpi=500)
+# ggsave("plots/int_dist_by_type_density.pdf",plot=interaction_distribution_by_type,h=6,w=6)
 ```
 
 ```{r ints dist by type and phys}
@@ -1292,20 +1302,22 @@ spp.only.mod.coeffs %>%
   geom_errorbar(aes(ymax=upper,ymin=lower),position='dodge',width=0.2)+
   labs(x='Interaction Type',y='Interaction Strength')
 
-# scatterplot mean vs. sd (removing intraspecies interactions)
+# scatterplot mean vs. sd (removing intraspecies interactions and young macrocystis)
 int_mean_sd_plot <- int_mean_sd %>%
-  filter(type != "intraspecies")%>%
+  filter(type != "intraspecies", effect != "ymac", mod != "ymac")%>%
   ggplot(aes(mean_int,sd_int))+
-  geom_point(aes(color=type),size=5)+
+  geom_point(aes(color=type,shape=type,fill=type),size=5)+
   geom_smooth(method="lm",se=F,col="black",show.legend = F)+
   geom_vline(xintercept=0,linetype=2)+
   # geom_encircle(aes(fill=type),col=NA,alpha=0.3,expand=0.1)+
   scale_color_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
   scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+  scale_shape_manual(values=c(15,16,17,18),name="")+
   guides(fill='none')+
   labs(x="Mean Interaction Strength",y="SD Interaction Strength")+
   theme(legend.position = c(0.2,0.8))
 # ggsave("plots/int_mean_sd.png",plot=int_mean_sd_plot,dpi=500)
+# ggsave("plots/int_mean_sd.pdf",plot=int_mean_sd_plot)
 int_mean_sd_plot
 
 # CV
@@ -1392,7 +1404,7 @@ spp.only.mod.coeffs %>%
 ```
 
 
-```{r simplex ints}
+```{r simplex ints,eval=F}
 # Run simplex projection for each species interaction
 interaction_names <- colnames(interactions.block)[3:22]
 interactions.simp.list <- list()
@@ -1416,7 +1428,7 @@ purrr::map_chr(interactions.simp.list,function(x) {
 ```
 
 
-```{r ccm}
+```{r ccm, eval=F}
 ## CCM checking physical variables against interactions
 # Rows hold predicted variables, columns hold forcing variables. In this case, the columns (forcing factors) are the physical variables, while the rows are the interactions
 n_col <- length(phys.vars)
@@ -1498,7 +1510,7 @@ interactions.xmap_all_plot
 
 ### Multivariate S-maps with Interactions
 
-```{r multivariate smaps}
+```{r multivariate smaps, eval=F}
 ints.causal.vars <- purrr::map(interaction_names, function(x) {
   interactions.xmap_rast %>%
     filter(predictee==x,!is.na(rho))->out

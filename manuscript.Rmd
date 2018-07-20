@@ -19,11 +19,28 @@ require(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE,results = 'asis',dpi=96)
 ```
 
+```{r packages and workspace}
+require(tidyverse)
+require(extrafont)
+load("ws/wrkspce_07.19.18.RData")
+
+# plot theme
+plot_theme <-   theme_minimal()+
+  theme(text=element_text(family="Rockwell",size=12,color="black"),
+        legend.text = element_text(size=14),
+        axis.title=element_text(family="Rockwell",size=14),
+        axis.text=element_text(family="Rockwell",size=8),
+        strip.background = element_rect(colour="black"),
+        panel.border = element_rect(color="black",fill=NA))
+
+theme_set(plot_theme)
+```
+
 **Primary target journal**: Nature Ecology and Evolution
 
 **Journal Guidelines**:
 
-* Maximum 3500 words main text (excluding introductory paragraph/abstract)
+* Maximum 3500 words main text (excluding introductory pa ragraph/abstract)
 * Maximum 6 display items (figures/tables)
 * The introductory paragraph is typically 150 words and is unreferenced; it contains a brief account of the background and rationale of the work, followed by a statement of the main conclusions introduced by the phrase "Here we show" or some equivalent.An introduction (without heading) of up to 500 words of referenced text expands on the background of the work (some overlap with the summary is acceptable), and is followed by a concise, focused account of the findings (headed 'Results'), and one or two short paragraphs of discussion (headed 'Discussion').
 
@@ -43,9 +60,8 @@ knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE,results = 'asis
 **FIGURES**
 
 Time series of study species
-Example attractor?
+Example attractor? (in supplementary)
 CCM results
-Empirical interaction web, in “normal”, “high disturbance”, and “high nutrient stress” environments??
 
 ***
 
@@ -63,41 +79,41 @@ Moreover, the focus of the search for context dependency has been on mean intera
 
 A solution to these difficulties is to a) utilize ecological observations collected over a long time period, across a large range of environmental contexts, with b) an analytical method to directly estimate context-dependent species interactions from those observations. Such an approach could help to characterize environmental contingencies in species interactions and explicitly examine interaction variability. Here, we use empirical dynamic modelling (EDM, [@Deyle2016]) to estimate a varying species interaction network and establish environmental context dependency in interaction strength and direction. Empirical dynamic modelling uses information from single or multiple time series to empirically model relationships between variables through the reconstruction of dynamic attractors (https://youtu.be/8DikuwwPWsY). The general modelling framework for all EDM methods is readily adaptable to many different sorts of time series variables, including environmental variables manifesting at different scales [@Deyle2013; @Chang2017; @Ye2015]. Because the methods are specifically designed for nonlinear dynamic systems, EDM---in theory---should be able to illuminate context-dependent patterns in species interactions.
 
-Recently-developed EDM methods exist for uncovering dynamic species interactions from time series data [@Deyle2016], but these methods have insofar been applied only to simulated and planktonic communities, and their utility to the study of other ecological systems remains untested. We focus here instead on giant kelp forests in southern California, a diverse and temporally dynamic ecosystem in which many important species interactions are well-documented [@Foster1985a; @Graham2007c; @Teagle2017]. The study of kelp forests has been foundational to ecological theory, especially regarding the relative influence of top-down and bottom-up structuring forces [@Estes1974a; @Graham1997; @Kvitek1998a; @Foster2010; @Reed2011]. Recently, however, findings from long-term kelp forest research programs have begun to challenge many long-held beliefs about the drivers of kelp forest ecosystem dynamics [@Reed2016]. In particular, a longer-term perspective has led to a recognition of the critical importance of environmental context—such as level of physical disturbance or the current state of El Niño conditions—for understanding kelp forest processes [@Parnell2010; @Byrnes2011; @Bell2015; @Young2015].
+Recently-developed EDM methods exist for uncovering dynamic species interactions from time series data [@Deyle2016], but these methods have insofar been applied only to simulated and planktonic communities, and their utility to the study of other ecological systems remains untested. We focus here instead on giant kelp forests in southern California, a diverse and temporally dynamic ecosystem in which many important species interactions are well-documented [@Foster1985a; @Graham2007c; @Teagle2017]. The study of kelp forests has been foundational to ecological theory, especially regarding the relative influence of top-down and bottom-up structuring forces in ecosystems [@Estes1974a; @Graham1997; @Kvitek1998a; @Foster2010; @Reed2011]. Recently, however, findings from long-term kelp forest research programs have begun to challenge many long-held beliefs about the drivers of kelp forest ecosystem dynamics [@Reed2016]. In particular, a longer-term perspective has led to a recognition of the critical importance of environmental context—such as level of physical disturbance or the current state of El Niño conditions—for understanding kelp forest processes [@Parnell2010; @Byrnes2011; @Bell2015; @Young2015]. In this study we utilize monitoring data from one such effort at San Nicolas Island, a small, remote member of the California Channel Islands in the northeast Pacific [@Kenner2013].
 
-In this study, we utilize monitoring data from one such effort at San Nicolas Island, a small, remote member of the California Channel Islands in the northeast Pacific [@Kenner2013]. Our analyses focus on the dynamics of five common southern California kelp forest species, whose interactions are thought to be important in structuring kelp forest ecosystems [@Foster1985a; @Foster1990a; @Teagle2017]. The giant kelp *Macrocystis pyrifera* is the eponymous foundation species, the primary canopy- and habitat-forming kelp along most of the central and southern coast of California [@Graham2007c]. We explore its dynamics and interactions with two presumptive competitors and two abundant herbivores. The understory kelp species *Laminaria farlowii* and *Pterygophora californica* compete with Macrocystis for space, light, and nutrients [@Dayton1984; @Dayton1999; @Reed1984]. The two herbivores---the purple sea urchin *Strongylocentrotus purpuratus* and the red sea urchin *Mesocentrotus franciscanus*---are thought in many places to control Macrocystis density and can sometimes wipe out entire giant kelp forests, leading to the alternative ecosystem state known as an urchin barren [@Ling2014].
-
-To characterize environmental context dependency in kelp forest interactions between these five species, we take three general steps (see Methods). First, we use empirical dynamic modeling causality tests called convergent cross-mapping [@Sugihara2012] to construct a kelp forest species interaction network directly from time series data. Even though these common kelp forest species are all thought to interact, we tested that assumption with convergent cross mapping, which can separate correlation from causation [@Sugihara2012].
-
-Second, we use multivariate S-maps (sequential locally weighted global linear maps) [@Deyle2016; @Sugihara1994] to reconstruct the interactions between species for all of the causal links established in the previous step. S-maps reconstructs dynamic “attractors” by casting the abundances of causally-related species into state space. That is, for a set of causally-related species $A$, $B$, and $C$, a point in multivariate space $\{A_t, B_t, C_t\}$ can be plotted, using each species’ abundance at time t. The attractor is then created by tracing this multivariate trajectory forward in time for all t (FIG?). S-maps then computes sequential Jacobian matrices for each point along the attractor, where the elements of each matrix are the partial derivatives between species. These estimated partial derivatives are our measure of species interactions.
-
-The last step is to investigate if and how species interactions varies with environmental context. Because multivariate S-maps are computed for every point along reconstructed attractors, we can extract distributions of interactions that can be related back to environmental context. We explore patterns of species interactions in relation to sea surface temperature, physical disturbance (measured by wave height), and three indices of low-frequency climate modes: the Multivariate ENSO Index, the Pacific Decadal Oscillation, and the North Pacific Gyre Oscillation [@Wolter2011; @Mantua2002; @DiLorenzo2008].
+To characterize environmental context dependency in kelp forest interactions between species, we take three general steps (see Methods). First, we use empirical dynamic modeling causality tests called convergent cross-mapping [@Sugihara2012] to construct a kelp forest species interaction network directly from time series data. In so doing, we test for all unidirectional causal signals between five common kelp forest species, as well as between five exogenous environmental variables and those species. Second, for each identified causal link between species, we reconstruct the actual species interactions over time, using another EDM tool called multivariate S-maps (sequential locally weighted global linear maps) [@Deyle2016; @Sugihara1994]. Finally, we show how variability in key species interactions can be related back to the environmental context under which they took place.
 
 ## Results and discussion
 
-```{r fig.width=4, fig.height=4,echo=FALSE,fig.cap="Example reconstructed dynamic attractor"}
-library(png)
-library(grid)
-include_graphics("plots/multi_attractor.pdf")
-```
+Our analyses focus on the dynamics of five common southern California kelp forest species, whose interactions are thought to be important in structuring kelp forest ecosystems [@Foster1985a; @Foster1990a; @Teagle2017]. The giant kelp *Macrocystis pyrifera* is the eponymous foundation species[@Dayton1972], the primary canopy- and habitat-forming kelp along most of the central and southern coast of California [@Graham2007c]. The monitoring data include young *Macrocystis* recruits (sporophytes identified as *Macrocystis* but less than 1 meter tall [@Kenner2013]). We explore *Macrocystis* dynamics and its interactions with two presumptive competitors and two abundant herbivores. The understory kelp species *Laminaria farlowii* and *Pterygophora californica* compete with Macrocystis for space, light, and nutrients [@Dayton1984; @Dayton1999; @Reed1984]. The two herbivores---the purple sea urchin *Strongylocentrotus purpuratus* and the red sea urchin *Mesocentrotus franciscanus*---are thought in many places to control *Macrocystis* density and can sometimes wipe out entire giant kelp forests, leading to the alternative ecosystem state known as an urchin barren [@Ling2014; @Harrold1985a]. 
+  
+In southern California, *Macrocystis* population dynamics can be driven by nutrient availability and physical disturbance [@Bell2015; @Reed2011]. The availability of nitrate is inversely related to seawater temperature[@Zimmerman1984] and, over longer time scales, is associated with oscillations in patterns of upwelling and oceanic currents. Accordingly, we include five environmental variables in our analyses to test their relationship to kelp forest species dynamics and interactions: sea surface temperature (SST), physical disturbance (measured by maximum seasonal wave height, SWH), and three indices of low-frequency climate modes: the Multivariate El Niño Index (MEI) [@Wolter2011], the Pacific Decadal Oscillation (PDO) [@Mantua2002], and the North Pacific Gyre Oscillation (NPGO) [@DiLorenzo2008].
 
-```{r fig.width=4, fig.height=4,echo=FALSE,fig.cap="Reconstructed interaction web using results of convergent cross mapping"}
+Applying convergent cross mapping[@Sugihara2012] (CCM) to the set of six biological and five physical variables, we find a relatively dense interaciton network (Figure \ref{fig:ccm}). Out of 90 possible unidirectional links between species and between species and the environmental variables, 40 are significant. Adult *Macrocystis* density is driven by all five environmental variables, with SWH, SST, and the NPGO showing the strongest causal signals. This finding confirms recent work by others using different methods [@Bell2015] that showed that these same three variables were the primary controls of giant kelp biomass dynamics across the California coast. More generally, although the included physical variables show significant links to many of the biological variables, the NPGO and SWH show the strongest links to almost all of the biological variables. Our analysis suggests that more attention should be focused on the effects of the NPGO.
+
+```{r fig.width=4, fig.height=4,fig.cap="Reconstructed interaction web using results of convergent cross mapping\\label{fig:ccm}"}
 include_graphics("plots/ccm_network.pdf")
 ```
 
-```{r echo=FALSE,fig.cap="Distribution of estimated interaction by type"}
-img <- readPNG("plots/int_dist_by_type_density.png")
-grid.raster(img)
+Interestingly, in turn, adult *Macrocystis* shows strong causal links to every other biological variable. This is despite the fact that the study site at San Nicolas Island does not have a stable giant kelp forest (see raw time series, Figure \ref{fig:normts}); rather, the site has transitioned from an urchin barren[@Harrold1985a] to a *Pterygophora* and *Laminaria*-dominated state, to a *Macrocystis* forest at various times throughout the 30-year time series. The implication is that, despite not maintaining dominance in the typical ecological sense of word (large abundance and biomass), *Macrocystis* is "dynamically dominant", and remains the key foundation species in this ecosystem. Its dynamics are fundamentally important in driving the dynamics of all the other kelp forest species[@Graham2007c].
+
+CCM analysis confirms that the system studied represents a complex array of significant interactions between algal species and their herbivores. However, CCM alone does not elucidate the direction and magnitude of species interactions. To obtain estimates of the interactions themselves, we use multivariate S-maps[@Deyle2016; @Sugihara1994] (see Methods). S-maps reconstructs dynamic “attractors” by casting the abundances of causally-related species into state space. For a set of causally-related species, a point in multivariate space can be plotted using each species’ abundance as an axis. The attractor is then created by tracing this multispecies trajectory forward in time (see example attractor in Figure \ref{fig:attractor}). For each point along the attractor, S-maps computes a Jacobian matrix, the elements of which are the estimated partial derivatives between species. These interaction matrix elements are our measure of species interactions. Because Jacobians are computed sequentially for every point along reconstructed attractors, we obtain estimates of interaction strength that vary with ecosystem state.
+
+There are two important aspects of S-maps that deserve mention. First, the S-map estimation procedure, like all EDM methods, is specifically designed for nonlinear systems, and is therefore an appropriate tool for investigating ecosystems exhibiting nonlinear dynamics such as alternative stable states or hysteresis[@Deyle2016]. Secondly, because S-maps utilizes reconstructed multispecies attractors, each estimated interaction is fundamentally based on observations of similar past ecosystem states---in our case represented as multivariate collections of causally-linked species' densites---rather than a phenomenological extrapolation of the most recent dynamics. In simple terms, instead of asking, "What is our prediction for the strength of herbivory based on last year's observed dynamics," S-maps is concerned with, "What is our best estimate for the strength of herbivory, based on our knowledge of times in the past when the ecosystem was most similar to today?"
+
+```{r fig.cap="Distribution of estimated interaction by type\\label{fig:int_dist}"}
+interaction_distribution_by_type
 ```
 
-```{r echo=FALSE, fig.cap="Mean and standard deviation of each estimated unidirectional species interaction"}
-img <- readPNG("plots/int_mean_sd.png")
-grid.raster(img)
+In the San Nicolas kelp forest, we find a striking prevalence of neutral and positive species interactions (Figure \ref{fig:int_dist}). After grouping species interactions by type, only herbivory (the effect of urchins on algae species) is predominantly negative. Conversely, the effect of the algae species on the urchins has the flattest distribution, with occasional strong negative and strong positive interactions. Likewise, contrary to our expectations, interactions between the algae species and between the urchin species are not always antagonistic. These results suggest that facilitation is common in kelp forests when context is considered. Since there is evidence here of strong herbivory, for example, then the indirect facilitative effects between algae species may sometimes outweigh their direct competition. Additionally, *Macrocystis* forests can mediate current strength and as a result, can also help retain reproductive propagules of other species[@Graham2007c]. These types of indirect facilitation in kelp forests have received little attention[@Arkema2009a; Benes2015] relative to a strong focus on exploitative competition between these species for light and nutrients[@Reed1984; @Dayton1984], but similar effects have been documented in other systems[@Baraza2006]. Our analysis does not contradict the importance of competition in kelp forest ecosystems, but suggests that facilitation, especially indirect facilitation, may be an important structuring factor in kelp forest ecosystems.
+
+```{r fig.cap="Mean and standard deviation of each estimated unidirectional species interaction"}
+int_mean_sd_plot
 ```
 
-```{r echo=FALSE,fig.cap="Macrocystis effect on Pterygophora"}
-img <- readPNG("plots/mac_effect_on_pter_phys.png")
-grid.raster(img)
+
+```{r fig.cap="Macrocystis effect on Pterygophora"}
+mac_effect_on_pter_plot
 ```
 
 
@@ -105,5 +121,15 @@ grid.raster(img)
 * Mean vs. variance in certain algal interactions?
 * Bidirectional mean interactions (across two dimensions, A on B and B on A)?
 * Frequency of positive vs. negative interactions? Across environmental gradients?
+
+## Methods
+
+```{r fig.width=4, fig.height=4,fig.cap="Example reconstructed dynamic attractor\\label{fig:attractor}"}
+include_graphics("plots/multi_attractor.pdf")
+```
+
+```{r fig.cap="Raw data for species and physical drivers, normalized to zero mean and unit variance\\label{fig:normts}"}
+include_graphics("plots/normalized_time_series.pdf")
+```
 
 ## References

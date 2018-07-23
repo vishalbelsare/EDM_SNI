@@ -606,7 +606,7 @@ curves[20] <- -0.1
 curves[c(6,39)] <- 0.2
 
 #plot to file if uncommented
-# pdf("plots/ccm_network.pdf",height=7,width=7)
+# png("plots/ccm_network.png",height=500,width=600)
 plot(g2,asp=0.8, vertex.label.color="black",vertex.label.family="Times", vertex.label.cex=0.6, edge.arrow.size=0.8,edge.arrow.width=0.8,vertex.label.font=2, vertex.shape="circle", edge.curved=curves,margin=0,vertex.size=20,rescale=T,edge.lty=1,edge.color=edge.cols,layout=layout_in_circle,vertex.color=vert.cols,vertex.frame.color="black",main="")
 # dev.off()
 ```
@@ -1214,6 +1214,46 @@ ggplot(aes(value,..density..,fill=phys_high_low))+
 mac_effect_on_pter_plot
 ```
 
+```{r pter effect ymac,fig.height=6,fig.width=6}
+pter_effect_ymac <-spp.only.coeffs.with.phys %>%
+  ungroup()%>%
+  filter(mod=="ymac",effect=="pter")%>%
+  mutate(phys_high_low=case_when(
+    ext_value > 1 ~ "high",
+    ext_value < -1 ~ "low")) %>%
+  filter(!is.na(phys_high_low))%>%
+  left_join(select(westend,period,one_of(phys.vars)),by="period")%>%
+  group_by(type,external_forcing,phys_high_low)%>%
+  mutate(mean_int=mean(value,na.rm=T))%>%
+  distinct()%>%
+  ungroup()
+
+# physical forcings labeller
+phys.labeller <- c(
+  mei= "MEI",
+  npgo= "NPGO",
+  pdo= "PDO",
+  sst="SST",
+  waves="SWH"
+)
+
+pter_effect_ymac_plot <-pter_effect_ymac %>%
+ggplot(aes(value,..density..,fill=phys_high_low))+
+  geom_density(col=NA,alpha=0.6)+
+  geom_vline(xintercept=0,linetype=2)+
+  geom_vline(aes(xintercept=mean_int,color=phys_high_low),size=1.5)+
+  scale_fill_manual(values=c("darkorange","dodgerblue4"),name="Physical\nForcing Value",labels=c("high","low"))+
+  scale_color_manual(values=c("darkorange","dodgerblue4"))+
+  guides(color="none")+
+  labs(x="Effect of Pterygophora on Macrocystis Recruits",y="Probability Density")+
+  facet_grid(rows=vars(external_forcing),labeller=labeller(external_forcing=phys.labeller))+
+  theme(strip.text=element_text(size=10))
+
+# ggsave("plots/pter_effect_ymac_phys.png",plot=pter_effect_ymac_plot,h=6,w=6,dpi=500)
+# ggsave("plots/pter_effect_ymac_phys.pdf",plot=pter_effect_ymac_plot,h=6,w=6)
+pter_effect_ymac_plot
+```
+
 ### Distribution of interaction strengths by type
 
 ```{r interactions density plot by type,fig.height=6,fig.width=6}
@@ -1230,7 +1270,7 @@ interaction_distribution_by_type <- spp.only.mod.coeffs %>%
   scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
    guides(fill=F)+
   xlim(-1.5,1.5)+
-  labs(x="Interaction strength",y="Kernel density")+
+  labs(x="Interaction strength",y="Probability density")+
   geom_text(aes(x=-1.5,y=0.5,label=type),hjust="inward",family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
   facet_grid(rows=vars(type))+
   theme(strip.text = element_blank())
@@ -1319,6 +1359,27 @@ int_mean_sd_plot <- int_mean_sd %>%
 # ggsave("plots/int_mean_sd.png",plot=int_mean_sd_plot,dpi=500)
 # ggsave("plots/int_mean_sd.pdf",plot=int_mean_sd_plot)
 int_mean_sd_plot
+
+# Mean vs. range (95%)
+
+int_mean_range_plot <- int_mean_sd %>%
+  filter(type != "intraspecies", effect != "ymac", mod != "ymac")%>%
+  ggplot(aes(abs_mean,y=upper-lower))+
+  geom_point(aes(color=type,shape=type,fill=type),size=5)+
+  geom_smooth(method="lm",se=F,col="black",linetype=2,show.legend = F)+
+  # geom_vline(xintercept=0,linetype=2)+
+  # geom_encircle(aes(fill=type),col=NA,alpha=0.3,expand=0.1)+
+  scale_color_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+  scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+  scale_shape_manual(values=c(15,16,17,18),name="")+
+  guides(fill='none')+
+  labs(x="Mean Interaction Strength",y="Range Interaction Strength")+
+  theme(legend.position = c(0.8,0.8),
+        legend.background = element_rect(color="black"))
+# ggsave("plots/int_mean_range.png",plot=int_mean_range_plot,h=5,w=6)
+# ggsave("plots/int_mean_range.pdf",plot=int_mean_sd_plot)
+int_mean_range_plot
+
 
 # CV
 spp.only.mod.coeffs %>%

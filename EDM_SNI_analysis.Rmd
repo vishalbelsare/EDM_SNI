@@ -17,13 +17,17 @@ knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message = FALSE,results = 'asis
 ```{r setup, include=FALSE,message=F}
 # Load required packages
 require(tidyverse)
+require(here)
 require(rEDM)
 require(quantreg)
 require(knitr)
 require(kableExtra)
 require(extrafont)
+require(png)
+require(ggridges)
 require(GGally)
 require(ggalt)
+require(ggsci)
 require(sna)
 require(network)
 require(gridExtra)
@@ -1258,21 +1262,27 @@ pter_effect_ymac_plot
 
 ```{r interactions density plot by type,fig.height=6,fig.width=6}
 # Density plot
+require(png)
+a1 <- readPNG(here::here("plots","icons","macrocystis-transparent.png")) %>% rasterGrob()
 interaction_distribution_by_type <- spp.only.mod.coeffs %>%
   filter(!is.na(type),type != "intraspecies")%>%
   group_by(type) %>%
   mutate(mean_int=mean(value,na.rm=T))%>%
   ungroup()%>%
-  ggplot(aes(value,..density..))+
-  geom_density(aes(fill=type),alpha=0.8,col=NA)+
+  ggplot(aes(value,type,fill=type))+
+  geom_density_ridges(alpha=0.8,scale=1.4)+
+  # stat_density_ridges(geom="density_ridges_gradient",calc_ecdf='true',quantiles=4,alpha=0.8,scale=1)+
+  # scale_fill_viridis_d(name="quantiles",alpha=0.8)+
   geom_vline(xintercept=0,linetype=2)+
-  geom_vline(aes(xintercept=mean_int))+
+  # geom_vline(aes(xintercept=mean_int,color=type))+
   scale_fill_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
-   guides(fill=F)+
+  scale_color_manual(values=c("darkorange1","orangered2","darkorchid1","palegreen3","skyblue1"),name="")+
+  guides(fill=F,color=F)+
   xlim(-1.5,1.5)+
   labs(x="Interaction strength",y="Probability density")+
-  geom_text(aes(x=-1.5,y=0.5,label=type),hjust="inward",family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
-  facet_grid(rows=vars(type))+
+  annotation_custom(a1,ymin=2,ymax=3,xmin=-1,xmax=-0.5)+
+  # geom_text(aes(x=-1.5,y=0.5,label=type),hjust="inward",family="Rockwell",fontface="italic",check_overlap = TRUE,size=4,show.legend = FALSE)+
+  # facet_grid(rows=vars(type))+
   theme(strip.text = element_blank())
 
 interaction_distribution_by_type
